@@ -74,12 +74,15 @@ without an extension code (an object created, nothing paired) is not
 offered.
 
 (¹) **A counter fed by a clamp is not offered in this version** (those the
-ED3 links to a clamp in `ID_Logger_tore`; without that list, all counters 11
-to 24): the unit of its index is not confirmed (Wh says GCE, but GCE's own
-example suggests mWh, which would make values 1000 times too large). The
-power of the clamp is confirmed (mW, published in W). It will be offered once
-the unit is checked on a real ED3. The status names those holding an index
-("C12, C13 (fed by a clamp): not offered until their unit is confirmed").
+ED3 links to a clamp in `ID_Logger_tore`): the unit of its index is not
+confirmed (Wh says GCE, but GCE's own example suggests mWh, which would make
+values 1000 times too large). The power of the clamp is confirmed (mW,
+published in W). It will be offered once the unit is checked on a real ED3.
+The status names those holding an index ("C12, C13 (fed by a clamp): not
+offered until their unit is confirmed"). An ED3 that does not give that list
+does not say which counters its clamps feed: the source of counters 11 to 24
+is then unknown, and all of them are held the same way, the status saying so
+("C11, C19 (source unknown: …)").
 
 ## Counters: lifetime indexes, never 0, a drop or a jump held
 
@@ -189,7 +192,10 @@ same ED3 as an earlier slot (same MAC address, its IP here and its name
 there, say) is not used, read again every 5 minutes only. Either way,
 nothing is published for it, no command leaves from it (not even a
 switch-off: the devices of the earlier slot drive that same ED3), and the
-status says so.
+status says so. So that the same ED3 is told before anything is offered, a
+slot after the first reads its ED3, at each start, once the earlier slots
+have read theirs (or failed, or read nothing: no address, a refused key, a
+pause): 25 seconds at most, once per start.
 
 ## Each ED3 keeps its devices
 

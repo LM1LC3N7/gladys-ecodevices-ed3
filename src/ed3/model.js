@@ -106,8 +106,8 @@ export function parseEd3(json) {
   const loggers = own(json, 'ID_Logger_tore');
   const powers = own(json, 'puissance');
   // The counters fed by a clamp: their index unit is not confirmed (Wh or mWh, see TODO.md),
-  // so they are not published as energy indexes. Without the list, any counter a clamp may
-  // feed (11 to 24) is taken as one.
+  // so they are not published as energy indexes. Without the list (`clampsListed` false), the
+  // source of the counters a clamp may feed (11 to 24) is unknown: all of them are held.
   const clampCounters = new Set();
   if (Array.isArray(loggers)) {
     for (const id of loggers.slice(0, LIMITS_ED3.clamps)) {
@@ -139,7 +139,7 @@ export function parseEd3(json) {
   if (volts !== undefined) {
     targets.set('mains', { code: 'mains', kind: KINDS.MAINS, value: volts });
   }
-  return { targets, clampCounters };
+  return { targets, clampCounters, clampsListed: Array.isArray(loggers) };
 }
 
 /** The relay states of a read back (`object/ed3/0?option=filter_state`): Map(code -> 0 | 1 | undefined). */

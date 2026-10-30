@@ -8,13 +8,10 @@
 
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { createFakeGladys } from '@gladysassistant/integration-sdk/testing';
-import { Ed3Hub } from '../src/hub.js';
-import { registerHandlers } from '../src/handlers.js';
 import { memoryStore } from '../src/store.js';
-import { testClock } from './kit/index.mjs';
 import { KEY, fakeEd3 } from './helpers/fakeEd3.js';
-import { CONFIG, F, SALT, SECOND, START, created, settle, setup } from './helpers/app.js';
+import { CONFIG, F, SECOND, created, setup } from './helpers/app.js';
+import { hubOf } from './helpers/hub.js';
 
 const message = (gladys, lang = 'en') => gladys.fake.connectionStatus?.message?.[lang] ?? '';
 const switchOf = (code) => created('relay', code, { relayKind: 'switch' });
@@ -76,30 +73,6 @@ test('I-4 (d9): /data read only, then writable again: the switch-off goes in bot
 });
 
 // --- Two slots -----------------------------------------------------------------------
-
-async function hubOf(config, boxOf, stores = new Map([1, 2, 3].map((s) => [s, memoryStore()]))) {
-  const clock = testClock({ start: START });
-  const gladys = createFakeGladys({ selector: 'ed3', config });
-  await gladys.connect();
-  const quiet = () => {};
-  const hub = new Ed3Hub({
-    gladys,
-    logger: { info: quiet, warn: quiet, error: quiet, debug: quiet },
-    transport: (o, h) => boxOf(o.hostname).transport(o, h),
-    now: clock.now,
-    monotonic: clock.monotonic,
-    timers: clock.timers,
-    storeOf: (slot) => stores.get(slot),
-    random: () => SALT,
-  });
-  registerHandlers(gladys, hub);
-  const wait = async (ms) => {
-    await clock.advance(ms);
-    await settle();
-  };
-  const ids = () => (gladys.fake.discoveredDevices ?? []).map((d) => d.external_id);
-  return { hub, gladys, wait, ids, clock, stores };
-}
 
 test('m-9 (s2c): slot 1 slower than slot 2, same ED3: slot 2 is never offered in Discover', async () => {
   const slow = fakeEd3();

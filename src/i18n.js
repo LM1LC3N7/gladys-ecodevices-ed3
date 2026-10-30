@@ -272,6 +272,12 @@ export const T = {
       `${list.en} (fed by a clamp): not offered until their unit is confirmed.`,
       `${list.fr} (alimentés par un tore) : non proposés tant que leur unité n’est pas confirmée.`,
     ),
+  // Without `ID_Logger_tore`: any counter 11 to 24 may be fed by a clamp, none is known to be.
+  counterSourceUnknown: (list) =>
+    both(
+      `${list.en} (source unknown: the ED3 does not list the counters its clamps feed, each may be one): not offered until the unit of those counters is confirmed.`,
+      `${list.fr} (source inconnue : l’ED3 ne liste pas les compteurs alimentés par ses tores, chacun peut en être un) : non proposés tant que l’unité de ces compteurs n’est pas confirmée.`,
+    ),
   indexHeld: (list) =>
     both(
       `Index held back (a jump or a drop, not sent to Gladys): ${list.en}. Only if it is right (a counter reset on the ED3), click "Accept the held index" twice: an accepted jump is counted in full by Gladys, at once.`,

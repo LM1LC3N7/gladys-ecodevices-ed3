@@ -202,10 +202,15 @@ export class Ed3App {
     this.peers = peers;
     /** The earlier slot this one duplicates (same address, or same MAC read); undefined if none. */
     this.duplicateOf = undefined;
-    /** Settled by the first round of each start (src/hub.js waits for it, see succeeded). */
-    this.firstRound = new Promise((resolve) => {
-      this.firstRoundResolve = resolve;
-    });
+    /**
+     * The first round of this start ended (read, failed, the same ED3 as an earlier slot), or
+     * none comes soon (no configuration, a refused key, a pause): the later slots wait for it
+     * once, before their own first round (see waitEarlierSlots).
+     */
+    this.firstRoundSettled = false;
+    /** That wait made at this start (once), and its end while it runs. */
+    this.earlierWaited = false;
+    this.earlierWait = undefined;
     // The budget of 300 states a minute counts on the monotonic clock; shared by the slots
     // when given (src/hub.js starts and stops it then).
     this.ownPublisher = !publisher;
@@ -248,6 +253,9 @@ export class Ed3App {
     /** No file, devices there, and the first save failed: owner unknown (see startNow). */
     this.storeLost = false;
     this.saveFailed = false;
+    /** A /data load or save still hanging past its bound: the next ones fail at once. */
+    this.loadStuck = false;
+    this.saveStuck = false;
     this.client = undefined;
     this.generation = 0;
     this.started = false;
@@ -489,8 +497,7 @@ export class Ed3App {
     try {
       // Bounded: a /data that never answers is unreadable, never a start held for good (a
       // switch-off clicked meanwhile waits for this start).
-      loaded = await this.bounded(this.store.load());
-      if (loaded === LATE) throw Object.assign(new Error('late'), { code: 'timeout' });
+      loaded = await this.loadMemory();
     } catch (err) {
       // Not the same as empty: nothing is written over it until it reads again.
       loaded = null;
@@ -518,6 +525,8 @@ export class Ed3App {
       await this.publishDevices();
       return;
     }
+    // No round soon (a refused key, a pause kept in /data): the later slots do not wait for one.
+    if (this.refusedApplies() || this.pauseLeft(mono) > 0) this.firstRoundDone();
     // Which ED3 the devices of this slot belong to, before anything is sent: from /data
     // and the configuration (an owner known by its MAC is checked first, see below).
     this.verdict = this.verdictAtStart();
@@ -661,6 +670,8 @@ export class Ed3App {
 
   stop() {
     this.generation += 1;
+    // A wait for the earlier slots ends now (its round sees the generation changed).
+    this.earlierWait?.();
     this.clearTimer();
     for (const timer of this.followUps) {
       this.timers.clearTimeout(timer);
@@ -710,10 +721,9 @@ export class Ed3App {
     this.otherDevice = undefined;
     this.duplicateOf = this.config.duplicateOf;
     this.peers?.macSeen(this.slot, undefined);
-    // Resolved by the first round of this start (or a start that reads nothing): see succeeded.
-    this.firstRound = new Promise((resolve) => {
-      this.firstRoundResolve = resolve;
-    });
+    // Set by the first round of this start (or a start that reads nothing soon).
+    this.firstRoundSettled = false;
+    this.earlierWaited = false;
     this.indexGuards.clear();
     this.indexMeta.clear();
     this.lastIndexAt = undefined;
@@ -809,9 +819,7 @@ export class Ed3App {
     if (this.storeUnreadable) {
       // Read again first: what it holds is never overwritten unseen.
       try {
-        const raw = await this.bounded(this.store.load());
-        if (raw === LATE) return false;
-        const loaded = normalizeMemory(raw, this.now());
+        const loaded = normalizeMemory(await this.loadMemory(), this.now());
         this.storeUnreadable = false;
         // The owner and its salt are the file's: none was set while it could not be read.
         this.memory.owner = loaded.owner;
@@ -865,9 +873,57 @@ export class Ed3App {
     }
   }
 
-  /** The first round of this start ended (read, failed, or none to make). */
+  /**
+   * /data read, bounded (TIMINGS.storeWait, then a timeout thrown). A load still hanging makes
+   * the next ones fail at once, as a save still hanging does: no round, test button nor
+   * command waits 5 s again for the same frozen /data; it is read again once that load ends.
+   */
+  async loadMemory() {
+    if (this.loadStuck) throw Object.assign(new Error('stuck'), { code: 'timeout' });
+    const load = this.store.load();
+    const raw = await this.bounded(load);
+    if (raw === LATE) {
+      this.loadStuck = true;
+      const free = () => {
+        this.loadStuck = false;
+      };
+      load.then(free, free);
+      throw Object.assign(new Error('late'), { code: 'timeout' });
+    }
+    return raw;
+  }
+
+  /** The first round of this start ended (read, failed, or none to make soon). */
   firstRoundDone() {
-    this.firstRoundResolve?.();
+    this.firstRoundSettled = true;
+    this.peers?.settled?.();
+  }
+
+  /**
+   * Once per start, before the first reads of a slot after the first (never between a read
+   * and its use): the earlier slots end the first round of their start, so that the same
+   * ED3 in two slots is told before this one binds, offers or publishes anything.
+   * TIMINGS.roundBudget at most; an earlier slot whose round failed, or that reads nothing
+   * soon (no configuration, a refused key, a pause), is not waited for.
+   */
+  waitEarlierSlots() {
+    const peers = this.peers;
+    if (this.earlierWaited || !peers?.earlierSettled) return undefined;
+    this.earlierWaited = true;
+    if (peers.earlierSettled(this.slot)) return undefined;
+    return new Promise((resolve) => {
+      const done = () => {
+        this.timers.clearTimeout(timer);
+        stopListening();
+        this.earlierWait = undefined;
+        resolve();
+      };
+      const timer = this.timers.setTimeout(done, TIMINGS.roundBudget);
+      const stopListening = peers.onSettled(() => {
+        if (peers.earlierSettled(this.slot)) done();
+      });
+      this.earlierWait = done;
+    });
   }
 
   /** `promise`, or LATE once TIMINGS.storeWait has passed (its later outcome ignored). */
@@ -969,14 +1025,18 @@ export class Ed3App {
       return;
     }
     const gone = () => generation !== this.generation;
-    this.lastReadAt = mono;
+    await this.waitEarlierSlots();
+    if (gone()) return;
+    // The round starts now (after that wait, if any): the pace counts from here.
+    const started = this.monotonic();
+    this.lastReadAt = started;
     // Kept BEFORE the read: a restart during it never reads again sooner.
     this.memory.lastAttemptAt = this.now();
     await this.saveMemory();
     if (gone()) return;
     let result;
     try {
-      result = await this.readRound(client, mono);
+      result = await this.readRound(client, started);
     } catch (err) {
       if (gone()) return;
       if (err instanceof Ed3Error && (err.code === 'cut' || (err.code === 'late' && !err.sent))) {
@@ -993,7 +1053,7 @@ export class Ed3App {
             })
           : undefined;
       if (gone()) return;
-      await this.failed(err, mono, other);
+      await this.failed(err, started, other);
       this.schedule();
       return;
     }
@@ -1028,10 +1088,15 @@ export class Ed3App {
     const info = await this.secondary(() => client.info(PRIORITY.READ, hooks()));
     const mac = parseMac(info);
     let at;
+    let ahead;
     const ed3 = parseEd3(
       await client.ed3(
         PRIORITY.READ,
-        hooks(() => (at = this.monotonic())),
+        hooks(() => {
+          at = this.monotonic();
+          // What had left ahead of the polling then (see succeeded).
+          ahead = client.sentAhead;
+        }),
       ),
     );
     if (ed3.error) throw new Ed3Error(ed3.error, 'not an Eco-Devices 3 answer', { sent: true });
@@ -1070,16 +1135,37 @@ export class Ed3App {
       for (const [code, target] of parsed.targets) targets.set(code, target);
       if (parsed.skipped) clampSkipped = parsed.skipped;
     }
-    return { targets, at, unreadTypes, seen: this.seenOf(mac), mac, clampSkipped };
+    return {
+      client,
+      targets,
+      at,
+      ahead,
+      unreadTypes,
+      seen: this.seenOf(mac),
+      mac,
+      clampSkipped,
+      clampsListed: ed3.clampsListed,
+    };
   }
 
-  async succeeded({ targets, at, unreadTypes, seen, mac, clampSkipped = [] }) {
-    const generation = this.generation;
-    // The earlier slots first read their own ED3 (bounded): a slot later in the list is never
-    // taken, offered nor published before a duplicate of an earlier one can be told.
-    if (mac && this.slot > 1 && this.peers?.waitEarlier) {
-      await this.peers.waitEarlier(this.slot, this.timers, TIMINGS.roundBudget);
-      if (generation !== this.generation) return;
+  async succeeded({
+    client,
+    targets,
+    at,
+    ahead,
+    unreadTypes,
+    seen,
+    mac,
+    clampSkipped = [],
+    clampsListed,
+  }) {
+    // A write, a read back (or an identity check) left after these reads, between two
+    // requests of the round: they are older than what it applied or read. Nothing of this
+    // round is applied (not a value, the owner, a duplicate nor the status); the next one
+    // comes at its time.
+    if (client.sentAhead !== ahead) {
+      this.logger.info('ed3: a command or a read back left during the round: round not applied');
+      return;
     }
     // The same ED3 (its MAC, memory only) already in an earlier slot: this one is not used (its
     // consumption would be counted twice); read again every few minutes only.
@@ -1117,7 +1203,7 @@ export class Ed3App {
     for (const [code, target] of targets) {
       this.model.set(code, { ...target, at });
     }
-    this.round = { unreadTypes, clampSkipped };
+    this.round = { unreadTypes, clampSkipped, clampsListed };
     // Which ED3 answered, against the owner of the devices, before anything is published.
     this.seen = seen;
     this.applyVerdict(this.judge(seen));
@@ -1245,7 +1331,11 @@ export class Ed3App {
     const held = this.heldEntries();
     if (held.length > 0) parts.push(T.indexHeld(heldList(held)));
     if (this.round?.clampSkipped?.length > 0) {
-      parts.push(T.clampCounters(listOf(this.round.clampSkipped.map((n) => `C${n}`))));
+      const skipped = listOf(this.round.clampSkipped.map((n) => `C${n}`));
+      // Without `ID_Logger_tore`, which counters a clamp feeds is not known: none is said to be.
+      parts.push(
+        this.round.clampsListed ? T.clampCounters(skipped) : T.counterSourceUnknown(skipped),
+      );
     }
     const faults = [...this.model.values()].filter((t) => t.fault === true);
     if (faults.length > 0) {

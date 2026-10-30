@@ -34,4 +34,10 @@ the notes of the version's GitHub Release.
 - With the owner of the devices unknown (/data deleted or restored on
   another machine), switch-offs still go to the address typed.
 - Counters fed by a current clamp are not offered until their unit (Wh or
-  mWh) is confirmed; the clamp power stays.
+  mWh) is confirmed; the clamp power stays. Without the list of the clamps,
+  counters 11 to 24 are held the same way, said of unknown source.
+- At start, a slot after the first reads once the earlier slots have read
+  their ED3 (25 s at most, once per start), so that the same ED3 is told
+  first; a round during which a command or a read back left is not applied
+  (its values are older).
+- A /data load that hangs makes the next ones fail at once, as a save does.

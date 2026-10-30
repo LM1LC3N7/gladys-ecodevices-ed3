@@ -11,7 +11,10 @@
 //   - the states: one publisher, so that the 300 states a minute of Gladys
 //     hold for all of them.
 // A slot is used when an address or a key is typed for it, or when it has
-// devices (they then get a status saying what is missing).
+// devices (they then get a status saying what is missing). At each start, a
+// slot after the first reads its ED3 once the earlier slots ended their first
+// round (25 s at most, once: src/app.js waitEarlierSlots), so that the same
+// ED3 in two slots is told before anything of the later one is offered.
 // -----------------------------------------------------------------------------
 
 import { createLogger } from '@gladysassistant/integration-sdk';
@@ -48,6 +51,8 @@ export class Ed3Hub {
     this.controllers = new Map();
     /** slot -> the MAC its ED3 answered last (memory only, never /data). */
     this.macs = new Map();
+    /** Told each time a slot ends the first round of its start (src/app.js waitEarlierSlots). */
+    this.settleListeners = new Set();
     const peers = {
       macSeen: (slot, mac) => (mac ? this.macs.set(slot, mac) : this.macs.delete(slot)),
       duplicateOf: (slot, mac) => {
@@ -56,18 +61,16 @@ export class Ed3Hub {
         }
         return undefined;
       },
-      /** The first round of every earlier slot (read or failed), `ms` at most. */
-      waitEarlier: (slot, timers, ms) => {
-        const earlier = [...this.controllers]
-          .filter(([other]) => other < slot)
-          .map(([, app]) => app.firstRound);
-        let timer;
-        return Promise.race([
-          Promise.all(earlier),
-          new Promise((resolve) => {
-            timer = timers.setTimeout(resolve, ms);
-          }),
-        ]).finally(() => timers.clearTimeout(timer));
+      /** Has every earlier slot ended the first round of its start (or has none to make)? */
+      earlierSettled: (slot) =>
+        [...this.controllers].every(([other, app]) => other >= slot || app.firstRoundSettled),
+      /** `listener` called at each first round ended; returns the function that removes it. */
+      onSettled: (listener) => {
+        this.settleListeners.add(listener);
+        return () => this.settleListeners.delete(listener);
+      },
+      settled: () => {
+        for (const listener of [...this.settleListeners]) listener();
       },
     };
     for (let slot = 1; slot <= slots; slot += 1) {

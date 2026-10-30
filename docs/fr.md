@@ -71,13 +71,16 @@ ne renomme pas un appareil déjà créé. Un compteur à 0 (pas configuré, ou p
 encore lu par l’ED3) n’est pas proposé ; un tore sans compteur non plus.
 
 (¹) **Un compteur alimenté par un tore n’est pas proposé dans cette version**
-(ceux que l’ED3 relie à un tore dans `ID_Logger_tore` ; sans cette liste,
-tous les compteurs 11 à 24) : l’unité de son index n’est pas confirmée (Wh
-selon GCE, mais l’exemple de GCE lui-même fait penser à des mWh, ce qui
-donnerait des valeurs 1000 fois trop grandes). La puissance du tore, elle,
-est confirmée (mW, publiée en W). Il le sera une fois l’unité vérifiée sur
-un vrai ED3. L’état nomme ceux qui ont un index (« C12, C13 (alimentés par
-un tore) : non proposés tant que leur unité n’est pas confirmée »).
+(ceux que l’ED3 relie à un tore dans `ID_Logger_tore`) : l’unité de son
+index n’est pas confirmée (Wh selon GCE, mais l’exemple de GCE lui-même fait
+penser à des mWh, ce qui donnerait des valeurs 1000 fois trop grandes). La
+puissance du tore, elle, est confirmée (mW, publiée en W). Il le sera une
+fois l’unité vérifiée sur un vrai ED3. L’état nomme ceux qui ont un index
+(« C12, C13 (alimentés par un tore) : non proposés tant que leur unité n’est
+pas confirmée »). Un ED3 qui ne donne pas cette liste ne dit pas quels
+compteurs ses tores alimentent : la source des compteurs 11 à 24 est alors
+inconnue, et tous sont retenus de la même façon, ce que dit l’état
+(« C11, C19 (source inconnue : …) »).
 
 L’ED3 est lu toutes les 15 secondes par défaut (10 s au moins). Une valeur
 que l’ED3 ne donne pas (absente, un texte, hors plage, une tension de 0 V)
@@ -199,7 +202,11 @@ emplacement précédent (même adresse MAC, par ex. son IP ici et son nom
 là) n’est pas utilisé, relu toutes les 5 minutes seulement. Dans les deux
 cas, rien n’est publié pour lui, aucune commande n’en part (pas même une
 extinction : les appareils de l’emplacement précédent pilotent ce même
-ED3), et l’état le dit.
+ED3), et l’état le dit. Pour que le même ED3 soit reconnu avant que rien ne
+soit proposé, un emplacement après le premier lit son ED3, à chaque
+démarrage, une fois que les emplacements précédents ont lu le leur (ou
+échoué, ou n’ont rien à lire : pas d’adresse, clé refusée, pause) : 25
+secondes au plus, une fois par démarrage.
 
 ## Chaque ED3 garde ses appareils
 

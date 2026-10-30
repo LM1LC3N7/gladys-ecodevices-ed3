@@ -40,6 +40,11 @@ export class Ed3Client {
     /** The job running: { priority, cut }. */
     this.current = undefined;
     this.closed = false;
+    /**
+     * Requests that left ahead of the reads of the polling (writes, read backs, identity
+     * checks): a round whose reads left before one of them is older than it (src/app.js).
+     */
+    this.sentAhead = 0;
   }
 
   /** Ends the client: what waits is refused (nothing sent), the request in flight is cut. */
@@ -130,7 +135,10 @@ export class Ed3Client {
         deadline: deadline ?? this.monotonic() + TIMINGS.requestTimeout,
         maxBytes: LIMITS.responseBytes,
         beforeSend,
-        onSent,
+        onSent: () => {
+          if (job.priority < PRIORITY.READ) this.sentAhead += 1;
+          onSent?.();
+        },
         onStart: (cut) => {
           running.cut = cut;
           if (running.cutAsked) cut();

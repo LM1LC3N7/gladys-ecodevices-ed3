@@ -68,7 +68,11 @@ index, dated on the session clock.
   of each slot is in /data (salted hash of the MAC of `system/info` when it
   gives one, else the controller key: address and port).
 - **One ED3, one slot**: a slot with the address or the MAC of an earlier
-  slot is not used (src/hub.js, `duplicateOf`).
+  slot is not used (src/hub.js, `duplicateOf`); a later slot waits for the
+  earlier ones once per start, before its first reads, never between a read
+  and its use (`waitEarlierSlots`).
+- **Nothing older than a command applied**: a round during which a write or
+  a read back left is dropped (`client.sentAhead`).
 - **The container rootfs is read-only.** Write only under `/data`; every
   load and save is bounded (`TIMINGS.storeWait`): never await /data for good.
 - **Versions belong to the Release workflow**; `test/manifest.test.js` checks

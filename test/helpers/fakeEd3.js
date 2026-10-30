@@ -43,7 +43,7 @@ export function fakeEd3(options = {}) {
     clock: undefined,
     relays: [false, false],
     relayNames: ['Relay 1', 'Relay 2'],
-    /** Clamps: their counter (0 = none) and power (mW). */
+    /** Clamps: their counter (0 = none) and power (mW); null: `ID_Logger_tore` not given. */
     loggers: [COUNTER_BASE + 12, COUNTER_BASE + 14, 0, 0, 0, 0, 0, 0],
     power: [56511, 2279, 0, 0, 0, 0, 0, 0],
     urms: 236.35,
@@ -210,7 +210,8 @@ function ed3(world, method, path, option) {
       ...states,
       name: 'ED3',
       errorStatus: '0x0000',
-      ID_Logger_tore: [...world.loggers],
+      // `loggers: null`: a firmware that does not give the list (no clamp known).
+      ...(world.loggers ? { ID_Logger_tore: [...world.loggers] } : {}),
       ToreName: ['Tore 1', 'Tore 2', 'Tore 3', 'Tore 4', 'Tore 5', 'Tore 6', 'Tore 7', 'Tore 8'],
       RelayName: [...world.relayNames],
       RelayMemoryMode: true,

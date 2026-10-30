@@ -156,6 +156,29 @@ output-index` (never an energy-sensor index: it would be counted as
   `currentGuard`, also checked by `indexStates`), R17 and R24 (as the review
   classed them).
 
+## Decisions after the review r3 (2026-10-30)
+
+- **I-5** (the m-9 wait made every round 25 s long and applied reads older
+  than a switch-off): a slot n > 1 waits for the earlier slots once per
+  start, before the reads of its first round (never between a read and its
+  use), 25 s at most (`waitEarlierSlots`, src/hub.js `earlierSettled`). An
+  earlier slot counts as done once its first round ended (read, failed, the
+  same ED3 as an earlier one) or when it reads nothing soon: no
+  configuration, a refused key or a pause kept in /data at start. A round
+  during which a write, a read back or an identity check left (the lane
+  counts them, `client.sentAhead`) is not applied at all: its reads are
+  older than that one; the next round comes at its time.
+- **m-15**: tests for P4, P5, P7 and P11 (test/review-r3.test.js). The
+  corrections of this round were mutated too (29 mutants: the wait, its
+  bound, its end by a stop, once per start, the settled slots, the round
+  not applied, the frozen load, the wording without `ID_Logger_tore`): all
+  killed; the equivalent mutants are still E2, E8, R17 and R24 only.
+- **m-16**: without `ID_Logger_tore`, the counters 11 to 24 are held for the
+  same reason (unit unconfirmed) but said of unknown source, never "fed by
+  a clamp".
+- **m-17**: a /data load still hanging makes the next ones fail at once, as
+  a save does (`loadMemory`); /data is read again once it ends.
+
 ## Decisions after the review r2 (2026-10-30)
 
 - **I-4**: owner unknown with devices there (/data deleted, empty, restored on
@@ -164,7 +187,8 @@ output-index` (never an energy-sensor index: it would be counted as
   "Attach the devices". Refusals only on proof: another MAC, another GCE box,
   a duplicate slot.
 - **m-9**: a slot n > 1 that read a MAC waits (25 s at most) for the first
-  round of every earlier slot before it binds, offers or publishes anything.
+  round of every earlier slot before it binds, offers or publishes anything
+  (replaced after r3, see I-5).
 - **m-10**: the pause of a duplicate slot keeps its earlier slot in /data
   (`code: 'duplicate', of`): said again at start; a slot without device nor
   owner says "Connecting", never "/data lost".
