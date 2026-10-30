@@ -227,3 +227,7 @@ output-index` (never an energy-sensor index: it would be counted as
 - **m-8**: the counters fed by a clamp (listed in `ID_Logger_tore`; without
   the list, 11 to 24) are not offered until their unit is confirmed
   (question 2); the clamp power (mW, two sources) is kept.
+
+## Next patch (review r4, 0436564)
+
+- m-18: a request that leaves ahead of a polling round drops the whole round; only the relay states (and the MAC after an identity check) are stale. Apply counters, clamps, voltage and X-THL, skip only those, and add a test (reviewer's r4-steady.mjs: commands every 2 s apply 2 of 7 rounds).
