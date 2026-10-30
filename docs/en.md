@@ -1,61 +1,225 @@
-# Demo Devices Template
+# Eco-Devices 3 for Gladys
 
-This is the user documentation of the integration. Gladys re-hosts this file
-and shows a permanent **Documentation** link to it in the Configuration screen
-(in the user's language, with English as the fallback) — it is when
-configuring that the user needs it most. Keep the short onboarding hints in
-the `section` blocks of the manifest `config_schema`; put the long
-step-by-step (screenshots, troubleshooting…) here.
+Brings **up to three GCE Electronics Eco-Devices 3 (ED3)** into Gladys
+through their local HTTP API: their counters (teleinfo, consumption,
+production, injection, storage, water, gas), the power of their current
+clamps, the mains voltage, their two relays, the outputs of their X-8R
+extensions and their X-THL sensors (temperature, humidity, luminosity).
+
+> Never tested with a real device: written from GCE's documentation of the
+> ED3 API (Postman "API ED3", linked from the ED3) and cce66's free tools
+> (ED3 Api-Deck and Mqtt-Deck). Tell us what you see on yours. Not
+> affiliated with GCE Electronics.
+
+## Setup
+
+1. In the ED3, Configuration menu: set an **API key** and note it.
+2. In Gladys, Integrations > Eco-Devices 3: type the address of the ED3
+   (e.g. `192.168.1.60`, with `:port` only if you changed the port of its
+   web server; give it a fixed address in your router) and the API key. On
+   the same page, list in "Relays Gladys may drive" the relays Gladys must
+   drive, and only those (`R1`, `R2`; see "Relays" below: never a pump, a
+   ventilation, a door strike…). Then save.
+3. "Test the connection" reads the ED3 at once (once an interval has passed
+   since the last read) and shows what it found.
+4. In Discover, create the devices you want. A listed relay comes as a
+   switch (or a light); the others come **read only** ("State (read
+   only)"): Gladys shows their state, nothing can switch them.
+
+A relay listed **after** its creation stays read only until you click
+**"Update"** on it in Discover: it then gets its switch (or light), next to
+its "State (read only)", which stays. The status of the integration says how
+many relays are read only while none is listed, and which listed relays
+still wait for "Update".
+
+The ED3 wants the API key in the address of every request, over plain http:
+anyone who can watch your local network can read it, as with the ED3's own
+page. The key is kept by Gladys in its database, never shown again, sent
+only to the ED3, and never written in the logs nor in the files of the
+integration.
+
+If the address answers as another GCE box (an IPX800 V5, an IPX800 V4 or an
+Eco-Devices RT2), the status and "Test the connection" say so, and nothing
+is read nor sent: use the integration of that box.
 
 ## What you get
 
-Six demo devices show up after installation: a weather station (real data
-from Open-Meteo), a switch, a dimmable light, a smart plug with power
-metering, a motion sensor and a camera.
+| On the ED3                                 | In Gladys                                                    | Code (in the name) |
+| ------------------------------------------ | ------------------------------------------------------------ | ------------------ |
+| Relays 1 and 2                             | read only, or a switch / light when you list it              | `R1`, `R2`         |
+| Output of an X-8R                          | read only (state)                                            | `X8R4259840-3`     |
+| Counter 0 (teleinfo total), 11 to 18       | consumption index (kWh), counted by Gladys (energy and cost) | `C0`, `C11`        |
+| Counters 20 and 21 (production)            | production index (kWh)                                       | `C20`              |
+| Counter 19 (injection)                     | index of the energy fed into the grid (kWh)                  | `C19`              |
+| Counters 1 to 10 (teleinfo tariffs)        | plain sensor "Tariff index (kWh)", never counted twice       | `C1`               |
+| Counters 22 to 24 (storage)                | plain sensor "Storage index (kWh)"                           | `C22`              |
+| Counters 25 to 27 (water), 28 and 29 (gas) | volume (m³), out of the energy monitoring                    | `C25`, `C28`       |
+| Clamp linked to a counter                  | power (W)                                                    | `T1`               |
+| Supply voltage                             | voltage (V)                                                  | `U`                |
+| X-THL                                      | temperature (°C), humidity (%), luminosity (lux)             | `XTHL4325376`      |
 
-## Configuration
+The counter numbers are the ED3's (GCE assigns them by category). The names
+you gave them on the ED3 are used in Discover (read again every 10
+minutes); a name changed later on the ED3 does not rename a device already
+created. A counter at 0 (not set up, or not read by the ED3 yet) is not
+offered; a clamp without a counter neither.
 
-1. Open the **Configuration** tab of the integration.
-2. Set the **latitude** and **longitude** the demo weather station should
-   observe (they default to Paris), and pick your temperature unit.
-   The **refresh interval** sets how often the weather station and the
-   plug's power are read: every 5 minutes by default, every minute at most.
-3. Save: the devices appear in the **Discovery** tab, ready to be added.
+The ED3 is read every 15 seconds by default (10 s at least). A value the
+ED3 does not give (absent, a text, out of range, a voltage of 0 V) is not
+published: never as 0. An X-THL reporting a measurement fault (`ioFault`)
+publishes nothing while it does, and the status names it. An X-8R or X-THL
+without an extension code (an object created, nothing paired) is not
+offered.
 
-The **Prefer the local connection** toggle drives the demo plug: it reports
-the channel it actually uses as a badge (local or cloud), with an orange dot
-when it runs degraded (local refused, cloud fallback).
+## Counters: lifetime indexes, never 0 nor a drop
 
-## Actions
+The index of a counter is a lifetime meter: Gladys derives the consumption
+(and its cost), the production, the injection from it. The integration
+passes it through a guard:
 
-- **Test the weather provider** — performs a live request to Open-Meteo and
-  shows the current temperature and humidity under the button.
-- **Identify a device** — pick one of your devices in the list and it will
-  signal itself (the demo light "blinks" in the logs).
+- an index of 0 is never sent;
+- an index that drops, or rises more than a home can draw (100 kW of
+  electricity, 10 m³/h of water, 16 m³/h of gas, plus a small slack), is
+  **held back**: the last accepted value is sent again, the status says it
+  ("Index held back: C11 (↑ 4072.301 → 14072.301 kWh)"), and it stays held
+  across a restart. Neither time nor repetition makes it accepted;
+- if it is right (a meter replaced, an index reset on the ED3), click
+  **"Accept the held index" twice**: the first click lists the held values
+  and takes nothing; the second, 3 seconds to 5 minutes later, takes exactly
+  those values (plus what the meter may measure between the clicks), for
+  each counter whose held value has not changed otherwise. Saving the
+  configuration never accepts;
+- the state of the guard is written to `/data` **before** Gladys gets the
+  index: if `/data` cannot be written or read, no index is sent, and the
+  status says so;
+- an index is sent once a minute at most.
 
-## Scenes
+The guard counts time on the session clock (the wall clock at start, then
+the time elapsed): a system clock that jumps does not widen its margin. A
+counter device deleted and created again starts from the value Gladys keeps
+for it.
 
-The integration adds its own cards to the scene editor (Gladys 5.1 or
-later), under the **Integrations** category:
+## Relays: read only unless you list them
 
-- **Motion detected** (trigger) — starts the scene when a demo motion sensor
-  sees something move. Optionally pick the sensor and what moved (person,
-  animal); left empty, any detection matches. The following actions can
-  read what moved with `{{triggerEvent.data.target}}`.
-- **Identify a device** (action) — makes the chosen device signal itself.
-  It returns whether the device could signal itself, so the following
-  actions can depend on it.
+A relay you do not list is **read only**. To drive one from Gladys, list it
+in "Relays Gladys may drive", e.g. `R1, R2:light` (`:light` makes it a
+light, a switch otherwise), preferably before creating it in Discover;
+already created, click "Update" on it in Discover. A switch or a light
+obeys every "turn everything off" of Google, Alexa, the MCP and the scenes:
+never list a pump, a freezer, a ventilation, a heating, a door strike nor a
+valve. Only R1 and R2 can be listed: the X-8R outputs stay read only in this
+version. A relay removed from the list is read only again at once: its
+commands are refused, and a switch-off the integration still held for it is
+dropped (in memory and in `/data`, after a restart too). Its switch stays on
+the device in Gladys (without effect): Gladys does not delete a single
+feature.
 
-## Dashboard
+The commands go through `GET /api/object/ed3/0/SetOnR/<n>` and
+`SetOffR/<n>` (absolute: never a toggle).
 
-Add the **Demo status** widget to a dashboard: it shows the live
-temperature of the weather station and the power of the office plug, the
-connection the plug currently uses (orange when degraded) and the observed
-location. Its **Identify the light** button makes the demo light signal
-itself.
+### Switching a listed relay off goes before anything
 
-## Troubleshooting
+Switching off a listed relay needs no option and goes before everything
+else: during a pause after failed reads, with a refused API key, with the
+command queue full, and before the first read after a restart. Clicked, it
+cuts any request in flight (a read, a read back, a command, a resend), but
+another switch-off clicked just before (cut in its turn once it has gone
+1 s without an answer).
 
-The integration logs everything it does: check the integration logs from the
-Gladys UI (or `docker logs` on the host) with `LOG_LEVEL=debug` for the full
-detail.
+It is refused only when: the address or the API key is missing; the relay
+is not listed, or is not R1 or R2; the value is not 0 or 1; the ED3 read is
+not the one of the device, or nothing tells (see "Each ED3 keeps its
+devices"). Clicked before the configuration is read from Gladys (the API key
+lives there only, never in `/data`), it asks Gladys for it at once and waits
+3 s; if it has not come, it is kept in memory and sent as soon as the key is
+known, before anything goes to Gladys; if the relay turns out not to be
+listed, the status says so. When the ED3 does not take it within 3.5 s (no
+connection), it is kept (in `/data`) and sent again as soon as the ED3 is
+free, before the read backs, by the next reads that show the relay on, and
+after a restart.
+
+A switch-off the reads do not show is sent again, 3 times at most; then the
+status says so (check on site). It stays held until a newer command on that
+relay leaves (your click), or, once applied, another state read twice in a
+row (changed on the ED3 itself, by its scenarios or its page): never by the
+time. A switch-on asked before the switch-off and not sent yet is cancelled:
+nothing leaves after it. A switch-on sent before the switch-off and left
+without an answer, if the ED3 still applies it within 5 s of its leaving, is
+no change on the ED3: the switch-off is sent again.
+
+## Commands
+
+A command is written within 3.5 s of the click or refused with "nothing was
+sent". It is then read back on the ED3: the value asked is a success; the
+state before is "not applied yet"; no answer in time gives "sent, without
+confirmation". Two reads follow, 5 s and 20 s later. The commands of a scene
+are written one after the other, then read back once. One request at a time
+to the ED3.
+
+## Several ED3
+
+Keep the first one in the top fields, and put the second one in
+**"Eco-Devices 3 #2"** (address, API key, its drivable relays), a third one
+in "Eco-Devices 3 #3". Each has its own devices in Discover ("ED3 #2 ·
+Relay 1 (R1)"), its list of drivable relays and its status on its line. The
+poll interval and the language are shared; "Accept the held index" applies
+to all.
+
+**Do not change the slot of an ED3 to try another one**: the devices
+already created stay with their slot.
+
+## Each ED3 keeps its devices
+
+A device created for an ED3 never gets the values of another ED3 nor drives
+its relays, even if you change the address of its slot (but the limit below, without a MAC address). The integration
+keeps, in `/data`, which ED3 the devices of each slot belong to:
+
+- by its **MAC address** when `GET /api/system/info` gives one (read again
+  every round, kept as a salted fingerprint, never in clear);
+- otherwise by its **address and port**. **Limit**: the ED3 API documents no
+  MAC address; when it gives none, another ED3 put at the same address is
+  not told apart from yours, and a change of address needs "Attach the
+  devices".
+
+If the ED3 read is not theirs: no command leaves for it, not even a
+switch-off; the switch-offs kept for the old one are dropped; none of its
+values is published onto these devices; Discover is empty for that slot;
+the status says so.
+
+Then put back the address of their ED3. If you **replaced** it (or it moved
+to another address without a readable MAC), click **"Attach the devices"
+twice** (within a minute), choosing the slot: its values then go to these
+devices and its listed relays obey them. The indexes stay guarded: a new
+ED3 whose counters differ sees its indexes held until you accept them. A
+slot without any device created simply takes the ED3 it reads.
+
+When the MAC address of an ED3 that gave one cannot be read, only
+switch-offs leave, and only to the address it was last checked at. At
+start, and after a failed read, its MAC address is read again before
+anything is sent: the switch-offs kept leave after that check, and a
+switch-off clicked waits for it 1.5 s at most, then leaves for the address
+it was last checked at.
+
+## Pauses and refusals
+
+A failed read pauses 10 s, 30 s, 1 min, 2 min then 5 min (a minute at least
+when the ED3 answers 429 or 503), the pause kept across a restart; switching
+a relay on is refused until the pause ends. An API key refused by the ED3
+(401, 403 on its main read) stops the reads until you change the key or
+"Test the connection" succeeds. A secondary read that fails (counters,
+names, X-8R, X-THL, `system/info`), even with a 401, stops nothing: what it
+gave stays known, without value, and the status says so. While an ED3 does
+not answer (or refuses the key), its devices leave Discover; a Scan does not
+bring them back. They come back with the first read that succeeds.
+
+## Limits
+
+- Relays R1 and R2, counters, clamps, voltage, X-8R (read only) and X-THL;
+  not the detailed teleinfo frame (apparent power, current tariff), the
+  pulse inputs, the X-8R commands, the schedules, the virtual variables nor
+  Modbus in this version.
+- The sign of the power of a clamp reading a production is not documented:
+  the power is published as the ED3 gives it (in W).
+- The integration reads the local HTTP API, not the MQTT of the ED3.
+- Three ED3 at most per integration.
+- http only (the ED3 answers over http on the local network).
