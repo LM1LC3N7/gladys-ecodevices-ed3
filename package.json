@@ -1,6 +1,6 @@
 {
   "name": "gladys-ecodevices-ed3",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "private": true,
   "description": "Gladys Assistant integration for the GCE Eco-Devices 3 (counters, clamps, relays, X-8R, X-THL) through its local HTTP API.",
   "type": "module",

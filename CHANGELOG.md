@@ -10,6 +10,8 @@ the notes of the version's GitHub Release.
 
 ## [Unreleased]
 
+## [0.1.1] - 2026-10-30
+
 ### Added
 
 - First version: up to three GCE Eco-Devices 3 through their local HTTP API
@@ -41,3 +43,6 @@ the notes of the version's GitHub Release.
   first; a round during which a command or a read back left is not applied
   (its values are older).
 - A /data load that hangs makes the next ones fail at once, as a save does.
+
+[Unreleased]: https://github.com/LM1LC3N7/gladys-ecodevices-ed3/compare/v0.1.1...HEAD
+[0.1.1]: https://github.com/LM1LC3N7/gladys-ecodevices-ed3/releases/tag/v0.1.1
