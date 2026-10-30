@@ -16,9 +16,9 @@
 
 import { createLogger } from '@gladysassistant/integration-sdk';
 import { Ed3App } from './app.js';
-import { SLOTS, slotConfig, slotTyped } from './config.js';
+import { SLOTS, normalizeConfig, slotConfigs, slotTyped } from './config.js';
 import { slotOf, slotPrefix } from './devices.js';
-import { T, both, join } from './i18n.js';
+import { ERRORS, T, both, join, word } from './i18n.js';
 import { StatePublisher } from './publisher.js';
 import { fileStore, stateFile } from './store.js';
 
@@ -46,6 +46,17 @@ export class Ed3Hub {
     this.published = undefined;
     this.loading = undefined;
     this.controllers = new Map();
+    /** slot -> the MAC its ED3 answered last (memory only, never /data). */
+    this.macs = new Map();
+    const peers = {
+      macSeen: (slot, mac) => (mac ? this.macs.set(slot, mac) : this.macs.delete(slot)),
+      duplicateOf: (slot, mac) => {
+        for (let other = 1; other < slot; other += 1) {
+          if (this.macs.get(other) === mac) return other;
+        }
+        return undefined;
+      },
+    };
     for (let slot = 1; slot <= slots; slot += 1) {
       this.controllers.set(
         slot,
@@ -60,6 +71,7 @@ export class Ed3Hub {
           ...(random ? { random } : {}),
           slot,
           publisher: this.publisher,
+          peers,
         }),
       );
     }
@@ -125,7 +137,7 @@ export class Ed3Hub {
         app.onConnected(async () => {
           const raw = await this.load(read);
           this.remember(raw);
-          return slotConfig(raw, slot);
+          return slotConfigs(raw, this.controllers.size).get(slot);
         }),
       ),
     );
@@ -140,8 +152,9 @@ export class Ed3Hub {
 
   async configUpdated(raw = {}) {
     this.remember(raw);
+    const configs = slotConfigs(raw, this.controllers.size);
     await Promise.all(
-      [...this.controllers].map(([slot, app]) => app.configUpdated(slotConfig(raw, slot))),
+      [...this.controllers].map(([slot, app]) => app.configUpdated(configs.get(slot))),
     );
     await this.pushStatus();
   }
@@ -218,16 +231,19 @@ export class Ed3Hub {
     await Promise.all([...this.controllers.values()].map((app) => app.scan()));
   }
 
+  // An id of a slot this version does not have (`ed37:`): not ours, a plain refusal.
   deviceCreated(device) {
-    return this.controllerOf(device?.external_id).deviceCreated(device);
+    return this.controllerOf(device?.external_id)?.deviceCreated(device);
   }
 
   deviceDeleted(device) {
-    return this.controllerOf(device?.external_id).deviceDeleted(device);
+    return this.controllerOf(device?.external_id)?.deviceDeleted(device);
   }
 
-  setValue(device, feature, value) {
-    return this.controllerOf(feature?.external_id).setValue(device, feature, value);
+  async setValue(device, feature, value) {
+    const app = this.controllerOf(feature?.external_id);
+    if (!app) throw new Error(word(ERRORS.unknownTarget, normalizeConfig(this.raw).language));
+    return app.setValue(device, feature, value);
   }
 
   /** "Test the connection": each ED3 used, at once (each has its own lane). */

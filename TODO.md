@@ -50,7 +50,9 @@ Confirmed by both (used):
 - `GET object/core_logger?option=filter_state`: 30 counters `{ _id, index,
 indexprix, moyenne, instMax, instMin, tarif }`, `_id` = 851968 + n; GCE:
   `index` "strictly increasing" in Wh (electricity) or mL (water, gas);
-  `?option=filter_name`: `{ _id, name }`.
+  `?option=filter_name` (`{ _id, name }`) is in cce66's Api-Deck only (not
+  in the Postman): one source, used for the names only (a failure changes
+  nothing but the names).
 - The kinds of the counters by number: 0 teleinfo total, 1-10 teleinfo
   tariffs, 11-18 consumption, 19 injection, 20-21 production, 22-24 storage,
   25-27 water, 28-29 gas (GCE table; Mqtt-Deck table).
@@ -65,7 +67,13 @@ indexprix, moyenne, instMax, instMin, tarif }`, `_id` = 851968 + n; GCE:
    the ED3 is known by its address only (the limit in the docs).
 2. `GET /api/object/core_logger?option=filter_state`: the `index` of a
    teleinfo counter against the ED3's own page: Wh as GCE writes (22534 =
-   22.534 kWh), or kWh / something else? And for a water counter: mL?
+   22.534 kWh), or kWh / something else? And for a water counter: mL (GCE's
+   Core Logger `unit` says "1 for litres")? **And one counter fed by a clamp
+   (one listed in `ID_Logger_tore`) against the ED3's page**: Wh or mWh?
+   GCE's own example has counters 11, 12, 19 to 23 near 407 million for
+   clamps reading 56 W and 2 W (407 MWh in Wh), and `conso` per clamp is in
+   mWh. Until he answers, the counters fed by a clamp are not offered (r1
+   m-8); to be settled before any release to the store.
 3. An unused counter: `index` 0 and the name empty (or "Compteur n")? Does
    the list always hold 30 entries?
 4. Storage: is it 22 charge, 23-24 discharge (Mqtt-Deck) or 22-24 "storage"
@@ -140,8 +148,38 @@ output-index` (never an energy-sensor index: it would be counted as
   the same key; an answer: status "This address answers as …", pause as a
   failure, no key refused, Discover empty.
 - **Units**: °C, %, lux, W, V, kWh, m³ only (the core list).
-- **Mutation pass** (milestone 1): the guards of the indexes, the pause, the
-  relay filter, the identity and the switch-off ordering are each killed by a
-  test; one equivalent mutant left: `raw <= 0` in `indexValue`
-  (src/ed3/model.js) is also caught by the `value > 0` check after the
-  conversion (no input tells them apart), both kept.
+- **Mutation pass**: milestone 1 left 7 mutants alive that the r1 review
+  found (E10, E11, E18, R3, R4, R25, R27; the note here then said none, which
+  was wrong); each has a test since (test/review-r1.test.js). Equivalent
+  mutants, kept as such: E2 (`raw <= 0` in `indexValue`, also caught by
+  `value > 0` after the conversion), E8 (`storeUnreadable` in
+  `currentGuard`, also checked by `indexStates`), R17 and R24 (as the review
+  classed them).
+
+## Decisions after the review r1 (2026-10-30)
+
+- **I-1**: no file, devices there, and the first save at start failing:
+  owner unknown as with an unreadable /data (`storeLost`): switch-offs to
+  the address typed, nothing else, Attach refused, a status; a later save
+  that succeeds makes it a /data lost (Attach asked). Ported from
+  gladys-ipx800 7786d42.
+- **I-2**: a slot with the address of an earlier slot is not started
+  (`duplicate_of`); a slot reading the MAC an earlier slot read (memory only,
+  across the slots, never /data) is not used: nothing published, no command
+  (a switch-off neither: the earlier slot drives that same ED3), read again
+  every 5 min, a status.
+- **I-3**: a relay write accepts any 2xx whatever the body (empty, text,
+  JSON); the read back of the state confirms.
+- **m-1**: an id of a slot this version does not have gets a plain refusal.
+- **m-2**: Attach works by the address when the MAC of an owner known by it
+  cannot be read any more.
+- **m-3**: every /data load and save is bounded (5 s, then a failure): a
+  frozen save holds neither a round nor a command, a frozen load at start is
+  an unreadable /data.
+- **m-5**: a switch-off that left clears the check of an older command of
+  ours on the relay (its guard reports instead).
+- **m-6**: another GCE box found at the address: no command at all, a
+  switch-off neither, kept ones dropped (the status says so).
+- **m-8**: the counters fed by a clamp (listed in `ID_Logger_tore`; without
+  the list, 11 to 24) are not offered until their unit is confirmed
+  (question 2); the clamp power (mW, two sources) is kept.

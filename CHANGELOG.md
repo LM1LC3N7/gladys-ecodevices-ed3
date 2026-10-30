@@ -27,3 +27,9 @@ the notes of the version's GitHub Release.
   replacement. Another GCE box at the address (IPX800 V5, IPX800 V4,
   Eco-Devices RT2) is said in the status.
 - "Test the connection"; French and English guides.
+- The same Eco-Devices 3 in two slots (same address, or same MAC under
+  another name) is refused: its counters would be counted twice.
+- A /data that was never writable, or that hangs, no longer blocks: only
+  switch-offs leave while the owner of the devices is unknown.
+- Counters fed by a current clamp are not offered until their unit (Wh or
+  mWh) is confirmed; the clamp power stays.

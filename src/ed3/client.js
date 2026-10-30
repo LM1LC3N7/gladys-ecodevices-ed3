@@ -152,7 +152,8 @@ export class Ed3Client {
   }
 
   /** A JSON answer of a 200, or the error of the status. */
-  async json(priority, options, hooks) {
+  /** The body of a 2xx answer (whatever it holds), or the error of the status. */
+  async ok(priority, options, hooks) {
     const { status, body } = await this.send(priority, options, hooks);
     if (status === 401 || status === 403) {
       throw new Ed3Error('refused', 'API key refused', { status, sent: true });
@@ -163,6 +164,12 @@ export class Ed3Client {
     if (status < 200 || status > 299) {
       throw new Ed3Error('http', 'unexpected answer', { status, sent: true });
     }
+    return body;
+  }
+
+  /** A JSON answer of a 2xx, or the error of the status. */
+  async json(priority, options, hooks) {
+    const body = await this.ok(priority, options, hooks);
     try {
       return JSON.parse(body.toString('utf8'));
     } catch {
@@ -209,12 +216,15 @@ export class Ed3Client {
     return this.get(`ebx/${type}`, '', priority, hooks);
   }
 
-  /** One relay of the ED3 on or off (`GET object/ed3/0/SetOnR/<n>` / `SetOffR/<n>`). */
+  /** One relay of the ED3 on or off (`GET object/ed3/0/SetOnR/<n>` / `SetOffR/<n>`), any 2xx. */
   async relay(n, on, priority, hooks) {
     if (!Number.isInteger(n) || n < 1 || n > LIMITS_ED3.relays || typeof on !== 'boolean') {
       throw new Ed3Error('bad_request', 'invalid write');
     }
-    await this.get(`object/ed3/0/${on ? 'SetOnR' : 'SetOffR'}/${n}`, '', priority, hooks);
+    // The answer is documented nowhere: any 2xx is accepted, whatever its body (empty, a text,
+    // JSON); the read back of the state confirms the command.
+    const path = this.path(`object/ed3/0/${on ? 'SetOnR' : 'SetOffR'}/${n}`);
+    await this.ok(priority, { method: 'GET', path }, hooks);
   }
 
   /**

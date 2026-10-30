@@ -144,7 +144,10 @@ export function reasonOf(err) {
     case 'size':
       return both('answer too large', 'réponse trop grande');
     case 'bad_response':
-      return both('not an Eco-Devices 3 answer', 'pas une réponse d’Eco-Devices 3');
+      return both(
+        'an answer that is not an Eco-Devices 3’s (not JSON, or another device)',
+        'une réponse qui n’est pas celle d’un Eco-Devices 3 (pas du JSON, ou un autre appareil)',
+      );
     default:
       return both('internal error', 'erreur interne');
   }
@@ -207,8 +210,8 @@ export const T = {
   },
   unreachable: (reason, wait) =>
     both(
-      `The Eco-Devices 3 does not answer (${reason.en}): new try in ${wait.en}.`,
-      `L’Eco-Devices 3 ne répond pas (${reason.fr}) : nouvel essai dans ${wait.fr}.`,
+      `The Eco-Devices 3 could not be read (${reason.en}): new try in ${wait.en}.`,
+      `L’Eco-Devices 3 n’a pas pu être lu (${reason.fr}) : nouvel essai dans ${wait.fr}.`,
     ),
   refused: both(
     'The Eco-Devices 3 refused the API key: no read until the key changes or "Test the connection" succeeds.',
@@ -266,8 +269,8 @@ export const T = {
     ),
   indexHeld: (list) =>
     both(
-      `Index held back (a jump or a drop, not sent to Gladys): ${list.en}. If it is right (a meter replaced, a counter reset), click "Accept the held index" twice.`,
-      `Index retenu (un saut ou une baisse, non envoyé à Gladys) : ${list.fr}. S’il est juste (compteur remplacé, remis à zéro), cliquez deux fois « Accepter l’index retenu ».`,
+      `Index held back (a jump or a drop, not sent to Gladys): ${list.en}. Only if it is right (a counter reset on the ED3), click "Accept the held index" twice: an accepted jump is counted in full by Gladys, at once.`,
+      `Index retenu (un saut ou une baisse, non envoyé à Gladys) : ${list.fr}. Seulement s’il est juste (compteur remis à zéro sur l’ED3), cliquez deux fois « Accepter l’index retenu » : un saut accepté est compté en entier par Gladys, d’un coup.`,
     ),
   storeProblem: both(
     'The state cannot be written to /data: no counter index is sent to Gladys until it can.',
@@ -277,9 +280,18 @@ export const T = {
     both(`it answers as ${OTHER_DEVICES[other].en}`, `il répond comme ${OTHER_DEVICES[other].fr}`),
   otherDevice: (other) =>
     both(
-      `This address answers as ${OTHER_DEVICES[other].en}, not an Eco-Devices 3: use the integration of that box (nothing is read nor sent meanwhile).`,
-      `Cette adresse répond comme ${OTHER_DEVICES[other].fr}, pas un Eco-Devices 3 : utilisez l’intégration de ce boîtier (rien n’est lu ni envoyé d’ici là).`,
+      `This address answers as ${OTHER_DEVICES[other].en}, not an Eco-Devices 3: use the integration of that box (no value is published nor any command sent, a switch-off neither, meanwhile).`,
+      `Cette adresse répond comme ${OTHER_DEVICES[other].fr}, pas un Eco-Devices 3 : utilisez l’intégration de ce boîtier (aucune valeur publiée ni commande envoyée, pas même une extinction, d’ici là).`,
     ),
+  duplicateSlot: (other, byMac = false) =>
+    both(
+      `${byMac ? 'The same Eco-Devices 3 (same MAC address)' : 'Same address'} as ED3 #${other}: an ED3 goes in one slot only (its counters would be counted twice). This one is not used, no command is sent from it; empty its address.`,
+      `${byMac ? 'Le même Eco-Devices 3 (même adresse MAC)' : 'Même adresse'} que l’ED3 n°${other} : un ED3 ne va que dans un emplacement (ses compteurs seraient comptés deux fois). Celui-ci n’est pas utilisé, aucune commande n’en part ; videz son adresse.`,
+    ),
+  ownerUnwritable: both(
+    'The state cannot be written to /data and holds nothing yet: which Eco-Devices 3 the devices belong to is unknown. Only switch-offs are sent, to the address typed, until /data can be written.',
+    'L’état ne peut pas être écrit dans /data, qui ne contient encore rien : on ne sait pas à quel Eco-Devices 3 appartiennent les appareils. Seules les extinctions sont envoyées, à l’adresse saisie, tant que /data ne peut pas être écrit.',
+  ),
   identityUnreadable: both(
     'Its MAC address could not be read this time: only switch-offs are sent until it is.',
     'Son adresse MAC n’a pas pu être lue cette fois : seules les extinctions sont envoyées d’ici là.',
@@ -325,6 +337,11 @@ export const T = {
         `Cliquez à nouveau dans la minute pour rattacher les ${count} appareil(s) de l’ED3 n°${slot} à l’Eco-Devices 3${mac} lu en ce moment : ses valeurs leur sont publiées, ses relais listés dans la configuration leur obéissent.`,
       );
     },
+    confirmAddress: (slot, count, macUnreadable) =>
+      both(
+        `Click again within a minute to attach the ${count} device(s) of ED3 #${slot} to the Eco-Devices 3 read now, known by its address${macUnreadable ? ' (its MAC address cannot be read)' : ''}: its values go to them, its relays listed in the configuration obey them.`,
+        `Cliquez à nouveau dans la minute pour rattacher les ${count} appareil(s) de l’ED3 n°${slot} à l’Eco-Devices 3 lu en ce moment, reconnu par son adresse${macUnreadable ? ' (son adresse MAC ne peut pas être lue)' : ''} : ses valeurs leur sont publiées, ses relais listés dans la configuration leur obéissent.`,
+      ),
     done: (slot, count) =>
       both(
         `Done: the ${count} device(s) of ED3 #${slot} belong to the Eco-Devices 3 read.`,
@@ -466,6 +483,15 @@ export const ERRORS = {
       `The Eco-Devices 3 at this address is not the one this device was created for (ED3 #${slot}): nothing was sent.`,
       `L’Eco-Devices 3 à cette adresse n’est pas celui pour lequel cet appareil a été créé (ED3 n°${slot}) : rien n’a été envoyé.`,
     ),
+  duplicateSlot: (other) =>
+    both(
+      `This slot holds the same Eco-Devices 3 as ED3 #${other} and is not used: nothing was sent.`,
+      `Cet emplacement contient le même Eco-Devices 3 que l’ED3 n°${other} et n’est pas utilisé : rien n’a été envoyé.`,
+    ),
+  ownerUnknown: both(
+    '/data cannot be read or written: which Eco-Devices 3 this device belongs to is unknown, only switch-offs are sent. Nothing was sent.',
+    '/data ne peut être ni lu ni écrit : on ne sait pas à quel Eco-Devices 3 appartient cet appareil, seules les extinctions sont envoyées. Rien n’a été envoyé.',
+  ),
   otherDevice: (other) =>
     both(
       `This address answers as ${OTHER_DEVICES[other].en}, not an Eco-Devices 3: nothing was sent.`,

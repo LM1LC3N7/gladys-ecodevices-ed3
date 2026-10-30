@@ -42,24 +42,26 @@ envoyée seulement à l’ED3, et jamais écrite dans les journaux ni dans les
 fichiers de l’intégration.
 
 Si l’adresse répond comme un autre boîtier GCE (un IPX800 V5, un IPX800 V4
-ou un Eco-Devices RT2), l’état et « Tester la connexion » le disent, et rien
-n’est lu ni envoyé : utilisez l’intégration de ce boîtier.
+ou un Eco-Devices RT2), l’état et « Tester la connexion » le disent : aucune
+valeur n’est publiée et aucune commande n’est envoyée, pas même une
+extinction, et les extinctions gardées sont abandonnées. Utilisez
+l’intégration de ce boîtier.
 
 ## Ce que vous obtenez
 
-| Sur l’ED3                               | Dans Gladys                                                      | Code (dans le nom) |
-| --------------------------------------- | ---------------------------------------------------------------- | ------------------ |
-| Relais 1 et 2                           | lecture seule, ou interrupteur / lumière si vous le listez       | `R1`, `R2`         |
-| Sortie d’un X-8R                        | lecture seule (état)                                             | `X8R4259840-3`     |
-| Compteur 0 (total téléinfo), 11 à 18    | index de consommation (kWh), compté par Gladys (énergie et coût) | `C0`, `C11`        |
-| Compteurs 20 et 21 (production)         | index de production (kWh)                                        | `C20`              |
-| Compteur 19 (injection)                 | index d’énergie injectée sur le réseau (kWh)                     | `C19`              |
-| Compteurs 1 à 10 (tarifs téléinfo)      | capteur simple « Index du tarif (kWh) », pas compté deux fois    | `C1`               |
-| Compteurs 22 à 24 (stockage)            | capteur simple « Index de stockage (kWh) »                       | `C22`              |
-| Compteurs 25 à 27 (eau), 28 et 29 (gaz) | volume (m³), hors suivi d’énergie                                | `C25`, `C28`       |
-| Tore relié à un compteur                | puissance (W)                                                    | `T1`               |
-| Tension d’alimentation                  | tension (V)                                                      | `U`                |
-| X-THL                                   | température (°C), humidité (%), luminosité (lux)                 | `XTHL4325376`      |
+| Sur l’ED3                                | Dans Gladys                                                      | Code (dans le nom) |
+| ---------------------------------------- | ---------------------------------------------------------------- | ------------------ |
+| Relais 1 et 2                            | lecture seule, ou interrupteur / lumière si vous le listez       | `R1`, `R2`         |
+| Sortie d’un X-8R                         | lecture seule (état)                                             | `X8R4259840-3`     |
+| Compteur 0 (total téléinfo), 11 à 18 (¹) | index de consommation (kWh), compté par Gladys (énergie et coût) | `C0`, `C11`        |
+| Compteurs 20 et 21 (production) (¹)      | index de production (kWh), compté par Gladys                     | `C20`              |
+| Compteur 19 (injection) (¹)              | index d’énergie injectée sur le réseau (kWh), affiché seulement  | `C19`              |
+| Compteurs 1 à 10 (tarifs téléinfo)       | capteur simple « Index du tarif (kWh) », pas compté deux fois    | `C1`               |
+| Compteurs 22 à 24 (stockage) (¹)         | capteur simple « Index de stockage (kWh) »                       | `C22`              |
+| Compteurs 25 à 27 (eau), 28 et 29 (gaz)  | volume (m³), hors suivi d’énergie                                | `C25`, `C28`       |
+| Tore relié à un compteur                 | puissance (W)                                                    | `T1`               |
+| Tension d’alimentation                   | tension (V)                                                      | `U`                |
+| X-THL                                    | température (°C), humidité (%), luminosité (lux)                 | `XTHL4325376`      |
 
 Les numéros des compteurs sont ceux de l’ED3 (GCE les attribue par
 catégorie). Les noms que vous leur avez donnés sur l’ED3 sont repris dans
@@ -67,17 +69,25 @@ Découverte (relus toutes les 10 minutes) ; un nom changé ensuite sur l’ED3
 ne renomme pas un appareil déjà créé. Un compteur à 0 (pas configuré, ou pas
 encore lu par l’ED3) n’est pas proposé ; un tore sans compteur non plus.
 
+(¹) **Un compteur alimenté par un tore n’est pas proposé dans cette version**
+(ceux que l’ED3 relie à un tore dans `ID_Logger_tore` ; sans cette liste,
+tous les compteurs 11 à 24) : l’unité de son index n’est pas confirmée (Wh
+selon GCE, mais l’exemple de GCE lui-même fait penser à des mWh, ce qui
+donnerait des valeurs 1000 fois trop grandes). La puissance du tore, elle,
+est confirmée (mW, publiée en W). Il le sera une fois l’unité vérifiée sur
+un vrai ED3.
+
 L’ED3 est lu toutes les 15 secondes par défaut (10 s au moins). Une valeur
 que l’ED3 ne donne pas (absente, un texte, hors plage, une tension de 0 V)
 n’est pas publiée : jamais comme 0. Un X-THL en défaut de mesure (`ioFault`)
 ne publie rien tant qu’il le reste, et l’état le nomme. Un X-8R ou un X-THL
 sans code d’extension (objet créé, rien d’appairé) n’est pas proposé.
 
-## Compteurs : index à vie, jamais 0 ni une baisse
+## Compteurs : index à vie, jamais 0, une baisse ou un saut retenu
 
 L’index d’un compteur est un compteur à vie : Gladys en tire la consommation
-(et son coût), la production, l’injection. L’intégration le passe par un
-garde-fou :
+(et son coût) et la production ; l’index d’injection est affiché, Gladys ne
+calcule rien dessus. L’intégration le passe par un garde-fou :
 
 - un index à 0 n’est jamais envoyé ;
 - un index qui baisse, ou qui monte plus que ce que la maison peut tirer
@@ -85,15 +95,20 @@ garde-fou :
   marge), est **retenu** : la dernière valeur acceptée est renvoyée, l’état
   le dit (« Index retenu : C11 (↑ 4072.301 → 14072.301 kWh) »), et il reste
   retenu au redémarrage. Ni le temps ni la répétition ne le font accepter ;
-- s’il est juste (compteur remplacé, index remis à zéro sur l’ED3), cliquez
-  **deux fois « Accepter l’index retenu »** : le premier clic liste les
+- seulement s’il est juste (index remis à zéro sur l’ED3), cliquez **deux
+  fois « Accepter l’index retenu »**. **Gladys compte un saut accepté en
+  entier, d’un coup** (consommation et coût) ; une baisse acceptée est
+  publiée et rien n’est compté pour elle. Après « Rattacher les appareils »
+  vers un autre ED3 dont l’index est plus haut, n’acceptez pas : supprimez
+  puis recréez l’appareil du compteur (son historique repart de zéro). Le
+  premier clic liste les
   valeurs retenues et ne prend rien ; le second, de 3 secondes à 5 minutes
   plus tard, prend exactement ces valeurs (plus ce que le compteur a pu
   mesurer entre les clics), pour chaque compteur dont la valeur retenue n’a
   pas changé autrement. Enregistrer la configuration n’accepte jamais ;
 - l’état du garde-fou est écrit dans `/data` **avant** que Gladys reçoive
-  l’index : si `/data` ne peut pas être écrit ou lu, aucun index ne part, et
-  l’état le dit ;
+  l’index : si `/data` ne peut pas être écrit ou lu (ou ne répond pas en
+  5 s), aucun index ne part, et l’état le dit ;
 - un index part une fois par minute au plus.
 
 Le garde-fou compte le temps sur l’horloge de la session (l’heure murale au
@@ -133,7 +148,9 @@ depuis 1 s).
 Elle n’est refusée que si : l’adresse ou la clé API manque ; le relais
 n’est pas listé, ou n’est pas R1 ou R2 ; la valeur n’est pas 0 ou 1 ; l’ED3
 lu n’est pas celui de l’appareil, ou rien ne permet de le savoir (voir
-« Chaque ED3 garde ses appareils »). Cliquée avant que la configuration soit
+« Chaque ED3 garde ses appareils ») ; l’adresse répond comme un autre
+boîtier GCE ; l’emplacement contient le même ED3 qu’un emplacement
+précédent (voir « Plusieurs ED3 »). Cliquée avant que la configuration soit
 lue dans Gladys (la clé API n’est gardée que là, jamais dans `/data`), elle
 la demande aussitôt à Gladys et attend 3 s ; si elle n’est pas venue, elle
 est gardée en mémoire et envoyée dès que la clé est connue, avant tout envoi
@@ -173,6 +190,15 @@ son état sur sa ligne. L’intervalle de lecture et la langue sont communs ;
 **Ne changez pas un emplacement d’ED3 pour en essayer un autre** : les
 appareils déjà créés restent avec leur emplacement.
 
+**Un ED3 ne va que dans un emplacement** : ses compteurs seraient comptés
+deux fois. Un emplacement dont l’adresse est celle d’un emplacement
+précédent n’est pas lu ; un emplacement qui lit le même ED3 qu’un
+emplacement précédent (même adresse MAC, par ex. son IP ici et son nom
+là) n’est pas utilisé, relu toutes les 5 minutes seulement. Dans les deux
+cas, rien n’est publié pour lui, aucune commande n’en part (pas même une
+extinction : les appareils de l’emplacement précédent pilotent ce même
+ED3), et l’état le dit.
+
 ## Chaque ED3 garde ses appareils
 
 Un appareil créé pour un ED3 ne reçoit jamais les valeurs d’un autre ED3 et
@@ -202,10 +228,19 @@ emplacement sans aucun appareil créé prend simplement l’ED3 qu’il lit.
 
 Quand l’adresse MAC d’un ED3 qui en donnait une ne peut pas être lue,
 seules les extinctions partent, et seulement vers l’adresse où il a été
-vérifié en dernier. Au démarrage, et après une lecture en échec, son adresse
+vérifié en dernier ; si elle reste illisible, « Rattacher les appareils »
+(deux clics) le rattache par son adresse. Au démarrage, et après une lecture en échec, son adresse
 MAC est relue avant tout envoi : les extinctions gardées partent après cette
 vérification, et une extinction cliquée l’attend 1,5 s au plus, puis part
 vers l’adresse où il a été vérifié en dernier.
+
+Si `/data` ne peut pas être lu, ou s’il est vide alors que des appareils
+existent et ne peut pas être écrit (un volume en lecture seule, par ex.),
+on ne sait pas à quel ED3 appartiennent les appareils : seules les
+extinctions partent, vers l’adresse saisie ; rien n’est publié, « Rattacher
+les appareils » est refusé, et l’état le dit. Une lecture ou une écriture de
+`/data` qui ne répond pas en 5 s compte comme un échec : elle ne retient ni
+les lectures ni les commandes.
 
 ## Pauses et refus
 
@@ -216,8 +251,8 @@ Une clé API refusée par l’ED3 (401, 403 sur sa lecture principale) arrête
 les lectures jusqu’à ce que vous changiez la clé ou que « Tester la
 connexion » aboutisse. Une lecture secondaire en échec (compteurs, noms,
 X-8R, X-THL, `system/info`), même en 401, n’arrête rien : ce qu’elle donnait
-reste connu, sans valeur, et l’état le dit. Tant qu’un ED3 ne répond pas
-(ou refuse la clé), ses appareils quittent la Découverte ; un Scan ne les y
+reste connu, sans valeur, et l’état le dit. Tant qu’un ED3 ne peut pas être
+lu (ou refuse la clé), ses appareils quittent la Découverte ; un Scan ne les y
 remet pas. Ils reviennent à la première lecture réussie.
 
 ## Limites

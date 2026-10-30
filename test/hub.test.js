@@ -161,7 +161,7 @@ test('one slot used: its status as is; a failing slot leaves the others and the 
   assert.equal(gladys.fake.connectionStatus.connected, false, 'not all connected');
   assert.match(
     gladys.fake.connectionStatus.message.en,
-    /ED3 #2: The Eco-Devices 3 does not answer/,
+    /ED3 #2: The Eco-Devices 3 could not be read/,
   );
   assert.ok(!ids().some((id) => id.includes(':ed32:')), 'the devices of #2 leave Discover');
   assert.ok(ids().includes('ext:ed3:relay:r1'), 'those of #1 stay');

@@ -67,7 +67,10 @@ index, dated on the session clock.
 - **A device never gets the values of, nor drives, another ED3**: the owner
   of each slot is in /data (salted hash of the MAC of `system/info` when it
   gives one, else the controller key: address and port).
-- **The container rootfs is read-only.** Write only under `/data`.
+- **One ED3, one slot**: a slot with the address or the MAC of an earlier
+  slot is not used (src/hub.js, `duplicateOf`).
+- **The container rootfs is read-only.** Write only under `/data`; every
+  load and save is bounded (`TIMINGS.storeWait`): never await /data for good.
 - **Versions belong to the Release workflow**; `test/manifest.test.js` checks
   they agree.
 - **Changelog** under `## [Unreleased]`.

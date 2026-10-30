@@ -503,7 +503,7 @@ test('r2 I1: a round left in the queue past its deadline is no failure of the ED
   await act(Promise.all(acks));
   assert.equal(app.failures, 0);
   assert.equal(app.pause, undefined);
-  assert.doesNotMatch(message(gladys), /does not answer/);
+  assert.doesNotMatch(message(gladys), /could not be read/);
   const after = await act(gladys.fake.setValue(relays[0], relays[0].features[0], 0));
   assert.ok(after.success || /Envoyée/.test(after.error), after.error);
   app.stop();

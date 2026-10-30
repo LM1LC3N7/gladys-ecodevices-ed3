@@ -50,7 +50,7 @@ export async function httpEd3({
         _id: 1245184,
         Relay_state: [...state.relays],
         RelayName: ['Relay 1', 'Relay 2'],
-        ID_Logger_tore: [COUNTER_BASE + 11, 0, 0, 0, 0, 0, 0, 0],
+        ID_Logger_tore: [COUNTER_BASE + 12, 0, 0, 0, 0, 0, 0, 0],
         puissance: [56511, 0, 0, 0, 0, 0, 0, 0],
         urms: 236.35,
       };

@@ -21,8 +21,8 @@
         "fr": "Votre Eco-Devices 3"
       },
       "description": {
-        "en": "Brings up to three GCE Electronics Eco-Devices 3 into Gladys through their local HTTP API and their API key: the counters (teleinfo, consumption, production, injection, water, gas: lifetime indexes, a jump or a drop held back until you accept it), the power of the current clamps, the mains voltage, the two relays (read only unless you list them below), the X-8R outputs (read only) and the X-THL sensors. Each Eco-Devices 3 keeps its own devices: another one never gets their values nor their commands. Never tested with a real device. Not affiliated with GCE Electronics.",
-        "fr": "Amène dans Gladys jusqu’à trois Eco-Devices 3 de GCE Electronics par leur API HTTP locale et leur clé d’API : les compteurs (téléinfo, consommation, production, injection, eau, gaz : index à vie, un saut ou une baisse retenu jusqu’à ce que vous l’acceptiez), la puissance des tores, la tension secteur, les deux relais (en lecture seule sauf ceux listés ci-dessous), les sorties X-8R (en lecture seule) et les capteurs X-THL. Chaque Eco-Devices 3 garde ses propres appareils : un autre ne reçoit jamais leurs valeurs ni leurs commandes. Jamais testé avec un vrai appareil. Sans lien avec GCE Electronics."
+        "en": "Brings up to three GCE Electronics Eco-Devices 3 into Gladys through their local HTTP API and their API key: the counters (teleinfo, consumption, production, injection, water, gas: lifetime indexes, a jump or a drop held back until you accept it; those fed by a clamp not yet, their unit unconfirmed), the power of the current clamps, the mains voltage, the two relays (read only unless you list them below), the X-8R outputs (read only) and the X-THL sensors. Each Eco-Devices 3 keeps its own devices: another one never gets their values nor their commands. Never tested with a real device. Not affiliated with GCE Electronics.",
+        "fr": "Amène dans Gladys jusqu’à trois Eco-Devices 3 de GCE Electronics par leur API HTTP locale et leur clé d’API : les compteurs (téléinfo, consommation, production, injection, eau, gaz : index à vie, un saut ou une baisse retenu jusqu’à ce que vous l’acceptiez ; pas encore ceux d’un tore, leur unité n’étant pas confirmée), la puissance des tores, la tension secteur, les deux relais (en lecture seule sauf ceux listés ci-dessous), les sorties X-8R (en lecture seule) et les capteurs X-THL. Chaque Eco-Devices 3 garde ses propres appareils : un autre ne reçoit jamais leurs valeurs ni leurs commandes. Jamais testé avec un vrai appareil. Sans lien avec GCE Electronics."
       },
       "links": [
         {
@@ -154,8 +154,8 @@
         "fr": "Eco-Devices 3 n°2 (facultatif)"
       },
       "description": {
-        "en": "Another Eco-Devices 3 of the house, with its own devices: fill in its address and its API key; leave empty otherwise. Never move an Eco-Devices 3 from one slot to another: its devices stay with their slot. The options above are shared.",
-        "fr": "Un autre Eco-Devices 3 de la maison, avec ses propres appareils : renseignez son adresse et sa clé d’API ; laissez vide sinon. Ne déplacez jamais un Eco-Devices 3 d’un emplacement à un autre : ses appareils restent avec leur emplacement. Les options ci-dessus sont communes."
+        "en": "Another Eco-Devices 3 of the house (never the same one as above: refused, its counters would be counted twice), with its own devices: fill in its address and its API key; leave empty otherwise. Never move an Eco-Devices 3 from one slot to another: its devices stay with their slot. The options above are shared.",
+        "fr": "Un autre Eco-Devices 3 de la maison (jamais le même qu’au-dessus : refusé, ses compteurs seraient comptés deux fois), avec ses propres appareils : renseignez son adresse et sa clé d’API ; laissez vide sinon. Ne déplacez jamais un Eco-Devices 3 d’un emplacement à un autre : ses appareils restent avec leur emplacement. Les options ci-dessus sont communes."
       }
     },
     {
@@ -213,8 +213,8 @@
         "fr": "Eco-Devices 3 n°3 (facultatif)"
       },
       "description": {
-        "en": "Another Eco-Devices 3 of the house, with its own devices: fill in its address and its API key; leave empty otherwise. Never move an Eco-Devices 3 from one slot to another: its devices stay with their slot. The options above are shared.",
-        "fr": "Un autre Eco-Devices 3 de la maison, avec ses propres appareils : renseignez son adresse et sa clé d’API ; laissez vide sinon. Ne déplacez jamais un Eco-Devices 3 d’un emplacement à un autre : ses appareils restent avec leur emplacement. Les options ci-dessus sont communes."
+        "en": "Another Eco-Devices 3 of the house (never the same one as above: refused, its counters would be counted twice), with its own devices: fill in its address and its API key; leave empty otherwise. Never move an Eco-Devices 3 from one slot to another: its devices stay with their slot. The options above are shared.",
+        "fr": "Un autre Eco-Devices 3 de la maison (jamais le même qu’au-dessus : refusé, ses compteurs seraient comptés deux fois), avec ses propres appareils : renseignez son adresse et sa clé d’API ; laissez vide sinon. Ne déplacez jamais un Eco-Devices 3 d’un emplacement à un autre : ses appareils restent avec leur emplacement. Les options ci-dessus sont communes."
       }
     },
     {
@@ -282,8 +282,8 @@
       },
       "timeout_seconds": 30,
       "description": {
-        "en": "Only when the status shows an index held back and it is right (a meter replaced, a counter reset on the Eco-Devices 3). Two clicks: the first lists the held values and takes nothing; the second, 3 seconds to 5 minutes later, takes the values listed, plus what the meter may measure between the clicks, for each counter whose held value has not changed otherwise. Saving the configuration never accepts.",
-        "fr": "Seulement quand l’état affiche un index retenu et qu’il est juste (compteur remplacé, remis à zéro sur l’Eco-Devices 3). Deux clics : le premier liste les valeurs retenues et ne prend rien ; le second, de 3 secondes à 5 minutes plus tard, prend les valeurs listées, plus ce que le compteur a pu mesurer entre les clics, pour chaque compteur dont la valeur retenue n’a pas changé autrement. Enregistrer la configuration n’accepte jamais."
+        "en": "Only when the status shows an index held back and it is right (a counter reset on the Eco-Devices 3). An accepted jump is counted in full by Gladys, at once (consumption and cost): after attaching the devices to another Eco-Devices 3 whose index is higher, delete and create the counter device again instead. Two clicks: the first lists the held values and takes nothing; the second, 3 seconds to 5 minutes later, takes the values listed, plus what the meter may measure between the clicks, for each counter whose held value has not changed otherwise. Saving the configuration never accepts.",
+        "fr": "Seulement quand l’état affiche un index retenu et qu’il est juste (compteur remis à zéro sur l’Eco-Devices 3). Un saut accepté est compté en entier par Gladys, d’un coup (consommation et coût) : après avoir rattaché les appareils à un autre Eco-Devices 3 dont l’index est plus haut, supprimez puis recréez plutôt l’appareil du compteur. Deux clics : le premier liste les valeurs retenues et ne prend rien ; le second, de 3 secondes à 5 minutes plus tard, prend les valeurs listées, plus ce que le compteur a pu mesurer entre les clics, pour chaque compteur dont la valeur retenue n’a pas changé autrement. Enregistrer la configuration n’accepte jamais."
       }
     },
     {
@@ -294,8 +294,8 @@
       },
       "timeout_seconds": 30,
       "description": {
-        "en": "Only when the status asks for it, after you REPLACED an Eco-Devices 3 (or after a reset of the integration’s data): its devices then get the values and drive the relays of the Eco-Devices 3 read now. Two clicks within a minute. Never to bring in another Eco-Devices 3: give it its own slot.",
-        "fr": "Seulement quand l’état le demande, après avoir REMPLACÉ un Eco-Devices 3 (ou une remise à zéro des données de l’intégration) : ses appareils reçoivent alors les valeurs et pilotent les relais de l’Eco-Devices 3 lu en ce moment. Deux clics dans la minute. Jamais pour ajouter un autre Eco-Devices 3 : donnez-lui son propre emplacement."
+        "en": "Only when the status asks for it, after you REPLACED an Eco-Devices 3 (or after a reset of the integration’s data): its devices then get the values and drive the relays of the Eco-Devices 3 read now. Two clicks within a minute. Never to bring in another Eco-Devices 3: give it its own slot. Also when its MAC address cannot be read any more: it is then attached by its address.",
+        "fr": "Seulement quand l’état le demande, après avoir REMPLACÉ un Eco-Devices 3 (ou une remise à zéro des données de l’intégration) : ses appareils reçoivent alors les valeurs et pilotent les relais de l’Eco-Devices 3 lu en ce moment. Deux clics dans la minute. Jamais pour ajouter un autre Eco-Devices 3 : donnez-lui son propre emplacement. Aussi quand son adresse MAC ne peut plus être lue : il est alors rattaché par son adresse."
       },
       "fields": [
         {

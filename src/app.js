@@ -133,6 +133,9 @@ const stopsRound = (err) =>
   ['cut', 'busy', 'network', 'timeout'].includes(err.code) ||
   (err.code === 'late' && !err.sent);
 
+/** A /data operation that did not settle within its bound (the store hangs). */
+const LATE = Symbol('late');
+
 /** Which secondary read gives a target: 'counters', 'x8r', 'xthl'; undefined for `object/ed3/0`. */
 /** The name of a secondary read in the status. */
 const unreadName = (type) =>
@@ -183,6 +186,7 @@ export class Ed3App {
     random = () => randomBytes(16).toString('hex'),
     slot = 1,
     publisher,
+    peers,
   }) {
     this.gladys = gladys;
     this.logger = logger;
@@ -194,6 +198,10 @@ export class Ed3App {
     this.random = random;
     /** Which ED3 of the configuration (1 to SLOTS): its ids and its /data file. */
     this.slot = slot;
+    /** The other slots (src/hub.js): which one already reads an ED3 of this MAC (memory only). */
+    this.peers = peers;
+    /** The earlier slot this one duplicates (same address, or same MAC read); undefined if none. */
+    this.duplicateOf = undefined;
     // The budget of 300 states a minute counts on the monotonic clock; shared by the slots
     // when given (src/hub.js starts and stops it then).
     this.ownPublisher = !publisher;
@@ -233,6 +241,8 @@ export class Ed3App {
     this.configGeneration = 0;
     this.memory = emptyMemory();
     this.storeUnreadable = false;
+    /** No file, devices there, and the first save failed: owner unknown (see startNow). */
+    this.storeLost = false;
     this.saveFailed = false;
     this.client = undefined;
     this.generation = 0;
@@ -470,12 +480,16 @@ export class Ed3App {
     this.reset();
     const now = this.now();
     const mono = this.monotonic();
-    let loaded = null;
+    let loaded;
     this.storeUnreadable = false;
     try {
-      loaded = await this.store.load();
+      // Bounded: a /data that never answers is unreadable, never a start held for good (a
+      // switch-off clicked meanwhile waits for this start).
+      loaded = await this.bounded(this.store.load());
+      if (loaded === LATE) throw Object.assign(new Error('late'), { code: 'timeout' });
     } catch (err) {
       // Not the same as empty: nothing is written over it until it reads again.
+      loaded = null;
       this.storeUnreadable = true;
       this.logger.warn(`ed3: /data unreadable (${err?.code ?? 'error'})`);
     }
@@ -483,6 +497,13 @@ export class Ed3App {
     this.adoptMemory(normalizeMemory(loaded, now), now, mono);
     this.memoryLoaded = true;
     if (!this.memory.salt && !this.storeUnreadable) this.memory.salt = this.random();
+    // No file, devices there, and /data cannot be written (never could, say): the owner of the
+    // devices is not known, as with a file that cannot be read (switch-offs still go).
+    this.storeLost = false;
+    if (loaded === null && !this.storeUnreadable && this.createdDevices().length > 0) {
+      this.storeLost = !(await this.saveMemory());
+      if (generation !== this.generation) return;
+    }
     if (this.ownPublisher) this.publisher.start();
     const missing = this.configMessage();
     if (missing) {
@@ -672,6 +693,8 @@ export class Ed3App {
     this.identityCheck = undefined;
     this.attachAsk = undefined;
     this.otherDevice = undefined;
+    this.duplicateOf = this.config.duplicateOf;
+    this.peers?.macSeen(this.slot, undefined);
     this.indexGuards.clear();
     this.indexMeta.clear();
     this.lastIndexAt = undefined;
@@ -680,6 +703,7 @@ export class Ed3App {
   }
 
   configMessage() {
+    if (this.config.duplicateOf !== undefined) return T.duplicateSlot(this.config.duplicateOf);
     if (this.config.addressError === 'path') return T.addressPath;
     if (this.config.addressError === 'https') return T.addressHttps;
     if (this.config.addressError === 'invalid') return T.addressInvalid;
@@ -765,7 +789,9 @@ export class Ed3App {
     if (this.storeUnreadable) {
       // Read again first: what it holds is never overwritten unseen.
       try {
-        const loaded = normalizeMemory(await this.store.load(), this.now());
+        const raw = await this.bounded(this.store.load());
+        if (raw === LATE) return false;
+        const loaded = normalizeMemory(raw, this.now());
         this.storeUnreadable = false;
         // The owner and its salt are the file's: none was set while it could not be read.
         this.memory.owner = loaded.owner;
@@ -786,7 +812,12 @@ export class Ed3App {
     }
     this.syncMemory();
     try {
-      await this.store.save(this.memory);
+      // Bounded: a save that hangs never holds a round, a command or the status; it is a
+      // failure (no index sent, said in the status) until a save succeeds again.
+      if ((await this.bounded(this.store.save(this.memory))) === LATE) {
+        throw Object.assign(new Error('late'), { code: 'timeout' });
+      }
+      this.storeLost = false;
       if (this.saveFailed) {
         this.saveFailed = false;
         this.logger.info('ed3: /data written again');
@@ -799,6 +830,16 @@ export class Ed3App {
       }
       return false;
     }
+  }
+
+  /** `promise`, or LATE once TIMINGS.storeWait has passed (its later outcome ignored). */
+  bounded(promise) {
+    let timer;
+    const late = new Promise((resolve) => {
+      timer = this.timers.setTimeout(() => resolve(LATE), TIMINGS.storeWait);
+    });
+    promise.catch(() => {});
+    return Promise.race([promise, late]).finally(() => this.timers.clearTimeout(timer));
   }
 
   async flush() {
@@ -970,7 +1011,7 @@ export class Ed3App {
       [
         'counters',
         () => client.counters(PRIORITY.READ, hooks()),
-        (json) => parseCounters(json, this.counterNames),
+        (json) => parseCounters(json, this.counterNames, ed3.clampCounters),
       ],
       ['x8r', () => client.extensions('x8r', PRIORITY.READ, hooks()), parseX8r],
       ['xthl', () => client.extensions('xthl', PRIORITY.READ, hooks()), parseXthl],
@@ -989,10 +1030,30 @@ export class Ed3App {
       }
       for (const [code, target] of parsed.targets) targets.set(code, target);
     }
-    return { targets, at, unreadTypes, seen: this.seenOf(mac) };
+    return { targets, at, unreadTypes, seen: this.seenOf(mac), mac };
   }
 
-  async succeeded({ targets, at, unreadTypes, seen }) {
+  async succeeded({ targets, at, unreadTypes, seen, mac }) {
+    // The same ED3 (its MAC, memory only) already in an earlier slot: this one is not used (its
+    // consumption would be counted twice); read again every few minutes only.
+    const duplicate = mac ? this.peers?.duplicateOf(this.slot, mac) : undefined;
+    if (duplicate !== undefined) {
+      if (this.duplicateOf !== duplicate) {
+        this.logger.warn(`ed3: ED3 #${this.slot} is the same ED3 as ED3 #${duplicate}: not used`);
+      }
+      this.duplicateOf = duplicate;
+      this.round = undefined;
+      this.offline = true;
+      this.otherDevice = undefined;
+      this.dropGuards('the same ED3 as an earlier slot');
+      this.setPause(this.monotonic(), TIMINGS.duplicatePause, 'failed');
+      await this.saveMemory();
+      await this.setStatus(false, T.duplicateSlot(duplicate, true));
+      await this.publishDevices();
+      return;
+    }
+    this.duplicateOf = this.config.duplicateOf;
+    if (mac) this.peers?.macSeen(this.slot, mac);
     this.pause = undefined;
     this.failures = 0;
     this.offline = false;
@@ -1033,6 +1094,8 @@ export class Ed3App {
       this.setPause(mono, wait, 'failed');
       this.offline = true;
       this.otherDevice = other;
+      // Never sent to that box, a switch-off neither: those kept are dropped.
+      this.dropGuards('another box at the address');
       this.lastReason = T.otherDeviceReason(other);
       this.logger.warn(`ed3: this address answers as ${other}, not an Eco-Devices 3`);
       await this.saveMemory();
@@ -1084,10 +1147,14 @@ export class Ed3App {
 
   /** The counts and the warnings of the last round. */
   statusMessage() {
-    if (this.verdict === 'different' || this.verdict === 'unbound') {
+    if (
+      this.verdict === 'different' ||
+      this.verdict === 'unbound' ||
+      (this.verdict === 'unverified' && !this.statusConnected())
+    ) {
       return join(
         this.verdictMessage(),
-        this.saveFailed || this.storeUnreadable ? T.storeProblem : undefined,
+        this.saveFailed && !this.ownerUnknown ? T.storeProblem : undefined,
       );
     }
     const counts = { relays: 0, counters: 0, clamps: 0, thl: 0 };
@@ -1100,11 +1167,7 @@ export class Ed3App {
     }
     const parts = [
       T.connected(counts),
-      this.verdict === 'unverified'
-        ? this.statusConnected()
-          ? T.identityUnreadable
-          : T.identityUnreadableNew
-        : undefined,
+      this.verdict === 'unverified' ? T.identityUnreadable : undefined,
       ...this.relayHints(),
     ];
     if (this.config.relayErrors.length > 0) {
@@ -1333,6 +1396,8 @@ export class Ed3App {
         // Counted once it has left (a try that never left is not a resend).
         guard.resends += 1;
         guard.sentAt = this.monotonic();
+        this.pendingWrites.delete(guard.code);
+        this.warnings.delete(guard.code);
       },
     })
       .catch((err) => {
@@ -1371,10 +1436,15 @@ export class Ed3App {
       : undefined;
   }
 
+  /** /data cannot be read, or cannot be written while it holds nothing: owner unknown. */
+  get ownerUnknown() {
+    return this.storeUnreadable || this.storeLost;
+  }
+
   /** Before any read: from /data and the configuration only. */
   verdictAtStart() {
     const owner = this.memory.owner;
-    if (this.storeUnreadable || !owner) return 'unbound';
+    if (this.ownerUnknown || !owner) return 'unbound';
     if (owner.kind === 'mac') return 'pending';
     return owner.id === this.config.key ? 'same' : 'different';
   }
@@ -1383,8 +1453,8 @@ export class Ed3App {
   judge(seen) {
     const owner = this.memory.owner;
     const key = this.config.key;
-    // /data unreadable is not empty: no owner is set over it (protective commands only).
-    if (this.storeUnreadable) return 'unbound';
+    // /data unreadable (or never written) is not empty: no owner is set over it.
+    if (this.ownerUnknown) return 'unbound';
     const hasDevices = this.createdDevices().length > 0;
     const bind = (why) => {
       this.memory.owner =
@@ -1476,6 +1546,8 @@ export class Ed3App {
    * devices, checked by the last round.
    */
   mayDrive(protective) {
+    // Another GCE box answers at this address, or the same ED3 is in an earlier slot: nothing.
+    if (this.otherDevice || this.duplicateOf !== undefined) return false;
     switch (this.verdict) {
       case 'same':
         return true;
@@ -1483,8 +1555,8 @@ export class Ed3App {
       case 'unverified':
         return protective && this.memory.owner?.at === this.config.key;
       case 'unbound':
-        // /data unreadable: its owner unknown, the switch-offs go to the address typed.
-        return protective && this.storeUnreadable;
+        // /data unreadable or never written: owner unknown, the switch-offs go to the address typed.
+        return protective && this.ownerUnknown;
       default:
         return false;
     }
@@ -1510,6 +1582,7 @@ export class Ed3App {
   }
 
   verdictError() {
+    if (this.duplicateOf !== undefined) return ERRORS.duplicateSlot(this.duplicateOf);
     if (this.otherDevice) return ERRORS.otherDevice(this.otherDevice);
     switch (this.verdict) {
       case 'different':
@@ -1520,7 +1593,7 @@ export class Ed3App {
           ? ERRORS.identityUnread
           : ERRORS.newAddress(this.slot);
       default:
-        return this.storeUnreadable ? ERRORS.saveFailed : ERRORS.notAttached(this.slot);
+        return this.ownerUnknown ? ERRORS.ownerUnknown : ERRORS.notAttached(this.slot);
     }
   }
 
@@ -1528,7 +1601,9 @@ export class Ed3App {
     if (this.verdict === 'different') {
       return T.otherEd3(this.slot, this.seen?.label);
     }
+    if (this.verdict === 'unverified') return T.identityUnreadableNew;
     if (this.storeUnreadable) return T.ownerUnreadable;
+    if (this.storeLost) return T.ownerUnwritable;
     return T.notAttached(this.slot);
   }
 
@@ -1543,23 +1618,33 @@ export class Ed3App {
       return T.attach.notRead;
     }
     if (this.verdict === 'same') return T.attach.already(this.slot);
-    if (this.storeUnreadable) return T.storeProblem;
-    if (this.verdict === 'unverified' || this.verdict === 'pending') return T.attach.unreadable;
+    // Kept nowhere (until the next restart only): refused, said.
+    if (this.ownerUnknown || this.saveFailed) return T.storeProblem;
+    if (this.verdict === 'pending') return T.attach.unreadable;
     const mono = this.monotonic();
     const id = this.seen?.id ?? this.config.key;
     const count = this.createdDevices().length;
     const ask = this.attachAsk;
     if (!ask || ask.id !== id || mono - ask.at > TIMINGS.attachConfirm) {
       this.attachAsk = { at: mono, id };
-      return T.attach.confirm(this.slot, this.seen?.label, count);
+      // An ED3 whose MAC cannot be read (any more): attached by its address.
+      return this.seen?.kind === 'mac'
+        ? T.attach.confirm(this.slot, this.seen.label, count)
+        : T.attach.confirmAddress(this.slot, count, this.memory.owner?.kind === 'mac');
     }
     this.attachAsk = undefined;
     const seen = this.seen;
     const key = this.config.key;
+    const before = this.memory.owner;
     this.memory.owner =
       seen?.kind === 'mac'
         ? { kind: 'mac', id: seen.id, at: key }
         : { kind: 'address', id: key, at: key };
+    // Written first: an attachment /data does not keep would be lost at the next restart.
+    if (!(await this.saveMemory())) {
+      this.memory.owner = before;
+      return T.storeProblem;
+    }
     this.dropGuards('devices attached to another ED3');
     this.verdict = 'same';
     this.logger.info(`ed3: devices of ED3 #${this.slot} attached to the ED3 read`);
@@ -1595,7 +1680,13 @@ export class Ed3App {
    */
   async publishDevices() {
     const devices = [];
-    if (this.round && !this.offline && this.verdict === 'same' && !this.refusedApplies()) {
+    if (
+      this.round &&
+      !this.offline &&
+      this.verdict === 'same' &&
+      this.duplicateOf === undefined &&
+      !this.refusedApplies()
+    ) {
       const created = new Map();
       for (const device of this.createdDevices()) created.set(device.external_id, device);
       for (const target of this.model.values()) {
@@ -2031,6 +2122,7 @@ export class Ed3App {
         throw this.refusal(ERRORS.configNotLoaded);
       }
     }
+    if (this.duplicateOf !== undefined) throw this.refusal(ERRORS.duplicateSlot(this.duplicateOf));
     if (!this.client) throw this.refusal(ERRORS.noConfig);
     if (kind === KINDS.RELAY) {
       if (wanted !== 0 && wanted !== 1) throw this.refusal(ERRORS.badValue);
@@ -2286,6 +2378,10 @@ export class Ed3App {
           onSent: () => {
             left = true;
             guard.sentAt = this.monotonic();
+            // An older command of ours on the relay is not the one to check any more (the
+            // guard tells whether this one is applied).
+            this.pendingWrites.delete(code);
+            this.warnings.delete(code);
           },
         });
         lastError = undefined;

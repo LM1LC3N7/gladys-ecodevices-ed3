@@ -105,6 +105,18 @@ export function parseEd3(json) {
   }
   const loggers = own(json, 'ID_Logger_tore');
   const powers = own(json, 'puissance');
+  // The counters fed by a clamp: their index unit is not confirmed (Wh or mWh, see TODO.md),
+  // so they are not published as energy indexes. Without the list, any counter a clamp may
+  // feed (11 to 24) is taken as one.
+  const clampCounters = new Set();
+  if (Array.isArray(loggers)) {
+    for (const id of loggers.slice(0, LIMITS_ED3.clamps)) {
+      const n = counterNumber(id);
+      if (n !== undefined) clampCounters.add(n);
+    }
+  } else {
+    for (let n = 11; n <= 24; n += 1) clampCounters.add(n);
+  }
   const clampNames = own(json, 'ToreName');
   if (Array.isArray(loggers)) {
     for (let n = 1; n <= LIMITS_ED3.clamps; n += 1) {
@@ -127,7 +139,7 @@ export function parseEd3(json) {
   if (volts !== undefined) {
     targets.set('mains', { code: 'mains', kind: KINDS.MAINS, value: volts });
   }
-  return { targets };
+  return { targets, clampCounters };
 }
 
 /** The relay states of a read back (`object/ed3/0?option=filter_state`): Map(code -> 0 | 1 | undefined). */
@@ -169,16 +181,20 @@ export function indexValue(raw, kind) {
 
 /**
  * `core_logger?option=filter_state` -> Map(code -> target): every counter
- * listed (by its `_id`), its index converted; `names`: Map(n -> name) when
- * read. Not a list: not an ED3 answer.
+ * listed (by its `_id`) but those fed by a clamp (`clampCounters`), its index
+ * converted; `names`: Map(n -> name) when read. Not a list: not an ED3 answer.
  */
-export function parseCounters(json, names) {
+export function parseCounters(json, names, clampCounters) {
   const items = list(json);
   if (!items) return { error: 'bad_response' };
   const targets = new Map();
+  const seen = new Set();
   for (const item of items) {
     const n = counterNumber(own(item, '_id'));
-    if (n === undefined || targets.has(`c${n}`)) continue;
+    if (n === undefined || seen.has(n)) continue;
+    seen.add(n);
+    // Fed by a clamp: its unit is not confirmed (Wh or mWh): never an index (TODO.md).
+    if (clampCounters?.has(n)) continue;
     const kind = counterKind(n);
     const value = indexValue(own(item, 'index'), kind);
     targets.set(`c${n}`, {

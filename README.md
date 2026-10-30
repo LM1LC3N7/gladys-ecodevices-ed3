@@ -7,8 +7,12 @@ production, injection, storage, water, gas), the power of the current
 clamps, the mains voltage, the two relays (read only unless you list them),
 the X-8R outputs (read only) and the X-THL sensors.
 
-- Counters: lifetime indexes, never 0 nor a drop; a jump or a drop is held
-  back until you accept it ("Accept the held index", two clicks).
+- Counters: lifetime indexes, never 0; a jump or a drop is held back until
+  you accept it ("Accept the held index", two clicks; an accepted jump is
+  counted in full by Gladys). Counters fed by a current clamp are not offered
+  yet (their unit is not confirmed).
+- One Eco-Devices 3 per slot: the same box in two slots is refused (its
+  energy would be counted twice).
 - Relays: read only unless listed in "Relays Gladys may drive"; switching a
   listed relay off goes before anything.
 - The API key is never written in the logs nor in `/data`.

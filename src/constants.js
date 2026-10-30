@@ -215,6 +215,10 @@ export const TIMINGS = {
   identityWait: 1_500,
   /** "Attach the devices": the second click within this. */
   attachConfirm: MINUTE,
+  /** A /data load or save that has not answered after this is a failure (never awaited for good). */
+  storeWait: 5 * SECOND,
+  /** The same ED3 as an earlier slot (its MAC): read again this often only. */
+  duplicatePause: 5 * MINUTE,
   /** "Accept the held index": the second click 3 s to 5 min after the first. */
   acceptAfter: 3 * SECOND,
   acceptWithin: 5 * MINUTE,

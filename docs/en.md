@@ -39,8 +39,9 @@ only to the ED3, and never written in the logs nor in the files of the
 integration.
 
 If the address answers as another GCE box (an IPX800 V5, an IPX800 V4 or an
-Eco-Devices RT2), the status and "Test the connection" say so, and nothing
-is read nor sent: use the integration of that box.
+Eco-Devices RT2), the status and "Test the connection" say so: no value is
+published and no command is sent, not even a switch-off, and the switch-offs
+kept are dropped. Use the integration of that box.
 
 ## What you get
 
@@ -48,11 +49,11 @@ is read nor sent: use the integration of that box.
 | ------------------------------------------ | ------------------------------------------------------------ | ------------------ |
 | Relays 1 and 2                             | read only, or a switch / light when you list it              | `R1`, `R2`         |
 | Output of an X-8R                          | read only (state)                                            | `X8R4259840-3`     |
-| Counter 0 (teleinfo total), 11 to 18       | consumption index (kWh), counted by Gladys (energy and cost) | `C0`, `C11`        |
-| Counters 20 and 21 (production)            | production index (kWh)                                       | `C20`              |
-| Counter 19 (injection)                     | index of the energy fed into the grid (kWh)                  | `C19`              |
+| Counter 0 (teleinfo total), 11 to 18 (¹)   | consumption index (kWh), counted by Gladys (energy and cost) | `C0`, `C11`        |
+| Counters 20 and 21 (production) (¹)        | production index (kWh), counted by Gladys                    | `C20`              |
+| Counter 19 (injection) (¹)                 | index of the energy fed into the grid (kWh), shown only      | `C19`              |
 | Counters 1 to 10 (teleinfo tariffs)        | plain sensor "Tariff index (kWh)", never counted twice       | `C1`               |
-| Counters 22 to 24 (storage)                | plain sensor "Storage index (kWh)"                           | `C22`              |
+| Counters 22 to 24 (storage) (¹)            | plain sensor "Storage index (kWh)"                           | `C22`              |
 | Counters 25 to 27 (water), 28 and 29 (gas) | volume (m³), out of the energy monitoring                    | `C25`, `C28`       |
 | Clamp linked to a counter                  | power (W)                                                    | `T1`               |
 | Supply voltage                             | voltage (V)                                                  | `U`                |
@@ -71,11 +72,18 @@ publishes nothing while it does, and the status names it. An X-8R or X-THL
 without an extension code (an object created, nothing paired) is not
 offered.
 
-## Counters: lifetime indexes, never 0 nor a drop
+(¹) **A counter fed by a clamp is not offered in this version** (those the
+ED3 links to a clamp in `ID_Logger_tore`; without that list, all counters 11
+to 24): the unit of its index is not confirmed (Wh says GCE, but GCE's own
+example suggests mWh, which would make values 1000 times too large). The
+power of the clamp is confirmed (mW, published in W). It will be offered once
+the unit is checked on a real ED3.
+
+## Counters: lifetime indexes, never 0, a drop or a jump held
 
 The index of a counter is a lifetime meter: Gladys derives the consumption
-(and its cost), the production, the injection from it. The integration
-passes it through a guard:
+(and its cost) and the production from it; the injection index is shown,
+Gladys computes nothing from it. The integration passes it through a guard:
 
 - an index of 0 is never sent;
 - an index that drops, or rises more than a home can draw (100 kW of
@@ -83,15 +91,19 @@ passes it through a guard:
   **held back**: the last accepted value is sent again, the status says it
   ("Index held back: C11 (↑ 4072.301 → 14072.301 kWh)"), and it stays held
   across a restart. Neither time nor repetition makes it accepted;
-- if it is right (a meter replaced, an index reset on the ED3), click
-  **"Accept the held index" twice**: the first click lists the held values
+- only if it is right (an index reset on the ED3), click **"Accept the held
+  index" twice**. **Gladys counts an accepted jump in full, at once**
+  (consumption and cost); an accepted drop is published and nothing is
+  counted for it. After "Attach the devices" to another ED3 whose index is
+  higher, do not accept: delete the counter device and create it again (its
+  history starts over). The first click lists the held values
   and takes nothing; the second, 3 seconds to 5 minutes later, takes exactly
   those values (plus what the meter may measure between the clicks), for
   each counter whose held value has not changed otherwise. Saving the
   configuration never accepts;
 - the state of the guard is written to `/data` **before** Gladys gets the
-  index: if `/data` cannot be written or read, no index is sent, and the
-  status says so;
+  index: if `/data` cannot be written or read (or does not answer within
+  5 s), no index is sent, and the status says so;
 - an index is sent once a minute at most.
 
 The guard counts time on the session clock (the wall clock at start, then
@@ -129,7 +141,8 @@ another switch-off clicked just before (cut in its turn once it has gone
 It is refused only when: the address or the API key is missing; the relay
 is not listed, or is not R1 or R2; the value is not 0 or 1; the ED3 read is
 not the one of the device, or nothing tells (see "Each ED3 keeps its
-devices"). Clicked before the configuration is read from Gladys (the API key
+devices"); the address answers as another GCE box; the slot holds the same
+ED3 as an earlier slot (see "Several ED3"). Clicked before the configuration is read from Gladys (the API key
 lives there only, never in `/data`), it asks Gladys for it at once and waits
 3 s; if it has not come, it is kept in memory and sent as soon as the key is
 known, before anything goes to Gladys; if the relay turns out not to be
@@ -168,6 +181,14 @@ to all.
 **Do not change the slot of an ED3 to try another one**: the devices
 already created stay with their slot.
 
+**An ED3 goes in one slot only**: its counters would be counted twice. A
+slot with the address of an earlier slot is not read; a slot that reads the
+same ED3 as an earlier slot (same MAC address, its IP here and its name
+there, say) is not used, read again every 5 minutes only. Either way,
+nothing is published for it, no command leaves from it (not even a
+switch-off: the devices of the earlier slot drive that same ED3), and the
+status says so.
+
 ## Each ED3 keeps its devices
 
 A device created for an ED3 never gets the values of another ED3 nor drives
@@ -194,11 +215,20 @@ ED3 whose counters differ sees its indexes held until you accept them. A
 slot without any device created simply takes the ED3 it reads.
 
 When the MAC address of an ED3 that gave one cannot be read, only
-switch-offs leave, and only to the address it was last checked at. At
+switch-offs leave, and only to the address it was last checked at; if it
+stays unreadable, "Attach the devices" (two clicks) attaches it by its
+address. At
 start, and after a failed read, its MAC address is read again before
 anything is sent: the switch-offs kept leave after that check, and a
 switch-off clicked waits for it 1.5 s at most, then leaves for the address
 it was last checked at.
+
+If `/data` cannot be read, or is empty while devices exist and cannot be
+written (a read-only volume, say), which ED3 the devices belong to is
+unknown: only switch-offs leave, to the address typed; nothing is published,
+"Attach the devices" is refused, and the status says so. A read or a write
+of `/data` that does not answer within 5 s counts as a failure: it holds
+neither the reads nor the commands.
 
 ## Pauses and refusals
 
@@ -208,8 +238,8 @@ a relay on is refused until the pause ends. An API key refused by the ED3
 (401, 403 on its main read) stops the reads until you change the key or
 "Test the connection" succeeds. A secondary read that fails (counters,
 names, X-8R, X-THL, `system/info`), even with a 401, stops nothing: what it
-gave stays known, without value, and the status says so. While an ED3 does
-not answer (or refuses the key), its devices leave Discover; a Scan does not
+gave stays known, without value, and the status says so. While an ED3
+cannot be read (or refuses the key), its devices leave Discover; a Scan does not
 bring them back. They come back with the first read that succeeds.
 
 ## Limits

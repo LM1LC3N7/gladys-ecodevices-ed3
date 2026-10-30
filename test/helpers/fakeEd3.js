@@ -44,7 +44,7 @@ export function fakeEd3(options = {}) {
     relays: [false, false],
     relayNames: ['Relay 1', 'Relay 2'],
     /** Clamps: their counter (0 = none) and power (mW). */
-    loggers: [COUNTER_BASE + 11, COUNTER_BASE + 12, 0, 0, 0, 0, 0, 0],
+    loggers: [COUNTER_BASE + 12, COUNTER_BASE + 14, 0, 0, 0, 0, 0, 0],
     power: [56511, 2279, 0, 0, 0, 0, 0, 0],
     urms: 236.35,
     /** Counter n -> index (Wh or mL); the others 0. */
@@ -189,6 +189,10 @@ function ed3(world, method, path, option) {
     const n = Number(relay[2]);
     if (n < 1 || n > 2) return json({}, 404);
     if (!world.ignoreWrites) world.relays[n - 1] = relay[1] === 'On';
+    // `writeBody`: what this firmware answers a write (undocumented): '' or a text, say.
+    if (world.writeBody !== undefined) {
+      return { status: 200, body: Buffer.from(world.writeBody, 'utf8') };
+    }
     return json({ status: 'Success' });
   }
   if (path === 'object/ed3/0') {

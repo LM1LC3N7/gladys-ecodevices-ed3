@@ -148,9 +148,9 @@ test('the status is not rewritten by a device event during a failure', async () 
   assert.match(message(gladys), /waiting for "Update"/);
   world.failReads = 500;
   await wait(10 * SECOND);
-  assert.match(message(gladys), /does not answer/);
+  assert.match(message(gladys), /could not be read/);
   await gladys.fake.deviceUpdated({ ...devices[0] });
-  assert.match(message(gladys), /does not answer/);
+  assert.match(message(gladys), /could not be read/);
   app.stop();
 });
 
