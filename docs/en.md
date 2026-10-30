@@ -49,7 +49,8 @@ kept are dropped. Use the integration of that box.
 | ------------------------------------------ | ------------------------------------------------------------ | ------------------ |
 | Relays 1 and 2                             | read only, or a switch / light when you list it              | `R1`, `R2`         |
 | Output of an X-8R                          | read only (state)                                            | `X8R4259840-3`     |
-| Counter 0 (teleinfo total), 11 to 18 (¹)   | consumption index (kWh), counted by Gladys (energy and cost) | `C0`, `C11`        |
+| Counter 0 (teleinfo total)                 | consumption index (kWh), counted by Gladys (energy and cost) | `C0`               |
+| Counters 11 to 18 (consumption) (¹)        | consumption index (kWh), counted by Gladys (energy and cost) | `C11`              |
 | Counters 20 and 21 (production) (¹)        | production index (kWh), counted by Gladys                    | `C20`              |
 | Counter 19 (injection) (¹)                 | index of the energy fed into the grid (kWh), shown only      | `C19`              |
 | Counters 1 to 10 (teleinfo tariffs)        | plain sensor "Tariff index (kWh)", never counted twice       | `C1`               |
@@ -77,7 +78,8 @@ ED3 links to a clamp in `ID_Logger_tore`; without that list, all counters 11
 to 24): the unit of its index is not confirmed (Wh says GCE, but GCE's own
 example suggests mWh, which would make values 1000 times too large). The
 power of the clamp is confirmed (mW, published in W). It will be offered once
-the unit is checked on a real ED3.
+the unit is checked on a real ED3. The status names those holding an index
+("C12, C13 (fed by a clamp): not offered until their unit is confirmed").
 
 ## Counters: lifetime indexes, never 0, a drop or a jump held
 
@@ -140,7 +142,7 @@ another switch-off clicked just before (cut in its turn once it has gone
 
 It is refused only when: the address or the API key is missing; the relay
 is not listed, or is not R1 or R2; the value is not 0 or 1; the ED3 read is
-not the one of the device, or nothing tells (see "Each ED3 keeps its
+proven to be another one (another MAC address, see "Each ED3 keeps its
 devices"); the address answers as another GCE box; the slot holds the same
 ED3 as an earlier slot (see "Several ED3"). Clicked before the configuration is read from Gladys (the API key
 lives there only, never in `/data`), it asks Gladys for it at once and waits
@@ -217,16 +219,20 @@ slot without any device created simply takes the ED3 it reads.
 When the MAC address of an ED3 that gave one cannot be read, only
 switch-offs leave, and only to the address it was last checked at; if it
 stays unreadable, "Attach the devices" (two clicks) attaches it by its
-address. At
+address: the first MAC address read afterwards becomes its identity, without
+being compared (you chose it by its address). At
 start, and after a failed read, its MAC address is read again before
 anything is sent: the switch-offs kept leave after that check, and a
 switch-off clicked waits for it 1.5 s at most, then leaves for the address
 it was last checked at.
 
-If `/data` cannot be read, or is empty while devices exist and cannot be
-written (a read-only volume, say), which ED3 the devices belong to is
-unknown: only switch-offs leave, to the address typed; nothing is published,
-"Attach the devices" is refused, and the status says so. A read or a write
+If `/data` is empty while devices exist (deleted, or an installation
+restored on another machine: the Gladys Plus backup does not hold the data
+of the integrations), or cannot be read, which ED3 the devices belong to is
+unknown. Nothing proves it is another one: switch-offs leave, to the address
+typed; switching on and the values stay refused until "Attach the devices"
+(two clicks), and the status says so. While `/data` can be neither read nor
+written, "Attach the devices" is refused too (it would not be kept). A read or a write
 of `/data` that does not answer within 5 s counts as a failure: it holds
 neither the reads nor the commands.
 

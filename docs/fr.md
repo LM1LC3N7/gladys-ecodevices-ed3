@@ -49,19 +49,20 @@ l’intégration de ce boîtier.
 
 ## Ce que vous obtenez
 
-| Sur l’ED3                                | Dans Gladys                                                      | Code (dans le nom) |
-| ---------------------------------------- | ---------------------------------------------------------------- | ------------------ |
-| Relais 1 et 2                            | lecture seule, ou interrupteur / lumière si vous le listez       | `R1`, `R2`         |
-| Sortie d’un X-8R                         | lecture seule (état)                                             | `X8R4259840-3`     |
-| Compteur 0 (total téléinfo), 11 à 18 (¹) | index de consommation (kWh), compté par Gladys (énergie et coût) | `C0`, `C11`        |
-| Compteurs 20 et 21 (production) (¹)      | index de production (kWh), compté par Gladys                     | `C20`              |
-| Compteur 19 (injection) (¹)              | index d’énergie injectée sur le réseau (kWh), affiché seulement  | `C19`              |
-| Compteurs 1 à 10 (tarifs téléinfo)       | capteur simple « Index du tarif (kWh) », pas compté deux fois    | `C1`               |
-| Compteurs 22 à 24 (stockage) (¹)         | capteur simple « Index de stockage (kWh) »                       | `C22`              |
-| Compteurs 25 à 27 (eau), 28 et 29 (gaz)  | volume (m³), hors suivi d’énergie                                | `C25`, `C28`       |
-| Tore relié à un compteur                 | puissance (W)                                                    | `T1`               |
-| Tension d’alimentation                   | tension (V)                                                      | `U`                |
-| X-THL                                    | température (°C), humidité (%), luminosité (lux)                 | `XTHL4325376`      |
+| Sur l’ED3                               | Dans Gladys                                                      | Code (dans le nom) |
+| --------------------------------------- | ---------------------------------------------------------------- | ------------------ |
+| Relais 1 et 2                           | lecture seule, ou interrupteur / lumière si vous le listez       | `R1`, `R2`         |
+| Sortie d’un X-8R                        | lecture seule (état)                                             | `X8R4259840-3`     |
+| Compteur 0 (total téléinfo)             | index de consommation (kWh), compté par Gladys (énergie et coût) | `C0`               |
+| Compteurs 11 à 18 (consommation) (¹)    | index de consommation (kWh), compté par Gladys (énergie et coût) | `C11`              |
+| Compteurs 20 et 21 (production) (¹)     | index de production (kWh), compté par Gladys                     | `C20`              |
+| Compteur 19 (injection) (¹)             | index d’énergie injectée sur le réseau (kWh), affiché seulement  | `C19`              |
+| Compteurs 1 à 10 (tarifs téléinfo)      | capteur simple « Index du tarif (kWh) », pas compté deux fois    | `C1`               |
+| Compteurs 22 à 24 (stockage) (¹)        | capteur simple « Index de stockage (kWh) »                       | `C22`              |
+| Compteurs 25 à 27 (eau), 28 et 29 (gaz) | volume (m³), hors suivi d’énergie                                | `C25`, `C28`       |
+| Tore relié à un compteur                | puissance (W)                                                    | `T1`               |
+| Tension d’alimentation                  | tension (V)                                                      | `U`                |
+| X-THL                                   | température (°C), humidité (%), luminosité (lux)                 | `XTHL4325376`      |
 
 Les numéros des compteurs sont ceux de l’ED3 (GCE les attribue par
 catégorie). Les noms que vous leur avez donnés sur l’ED3 sont repris dans
@@ -75,7 +76,8 @@ tous les compteurs 11 à 24) : l’unité de son index n’est pas confirmée (W
 selon GCE, mais l’exemple de GCE lui-même fait penser à des mWh, ce qui
 donnerait des valeurs 1000 fois trop grandes). La puissance du tore, elle,
 est confirmée (mW, publiée en W). Il le sera une fois l’unité vérifiée sur
-un vrai ED3.
+un vrai ED3. L’état nomme ceux qui ont un index (« C12, C13 (alimentés par
+un tore) : non proposés tant que leur unité n’est pas confirmée »).
 
 L’ED3 est lu toutes les 15 secondes par défaut (10 s au moins). Une valeur
 que l’ED3 ne donne pas (absente, un texte, hors plage, une tension de 0 V)
@@ -147,8 +149,8 @@ depuis 1 s).
 
 Elle n’est refusée que si : l’adresse ou la clé API manque ; le relais
 n’est pas listé, ou n’est pas R1 ou R2 ; la valeur n’est pas 0 ou 1 ; l’ED3
-lu n’est pas celui de l’appareil, ou rien ne permet de le savoir (voir
-« Chaque ED3 garde ses appareils ») ; l’adresse répond comme un autre
+lu est prouvé être un autre (une autre adresse MAC, voir « Chaque ED3 garde
+ses appareils ») ; l’adresse répond comme un autre
 boîtier GCE ; l’emplacement contient le même ED3 qu’un emplacement
 précédent (voir « Plusieurs ED3 »). Cliquée avant que la configuration soit
 lue dans Gladys (la clé API n’est gardée que là, jamais dans `/data`), elle
@@ -229,16 +231,21 @@ emplacement sans aucun appareil créé prend simplement l’ED3 qu’il lit.
 Quand l’adresse MAC d’un ED3 qui en donnait une ne peut pas être lue,
 seules les extinctions partent, et seulement vers l’adresse où il a été
 vérifié en dernier ; si elle reste illisible, « Rattacher les appareils »
-(deux clics) le rattache par son adresse. Au démarrage, et après une lecture en échec, son adresse
+(deux clics) le rattache par son adresse : la première adresse MAC lue
+ensuite devient son identité, sans être comparée (vous l’avez choisi par
+son adresse). Au démarrage, et après une lecture en échec, son adresse
 MAC est relue avant tout envoi : les extinctions gardées partent après cette
 vérification, et une extinction cliquée l’attend 1,5 s au plus, puis part
 vers l’adresse où il a été vérifié en dernier.
 
-Si `/data` ne peut pas être lu, ou s’il est vide alors que des appareils
-existent et ne peut pas être écrit (un volume en lecture seule, par ex.),
-on ne sait pas à quel ED3 appartiennent les appareils : seules les
-extinctions partent, vers l’adresse saisie ; rien n’est publié, « Rattacher
-les appareils » est refusé, et l’état le dit. Une lecture ou une écriture de
+Si `/data` est vide alors que des appareils existent (supprimé, ou une
+installation restaurée sur une autre machine : la sauvegarde Gladys Plus ne
+contient pas les données des intégrations), ou s’il ne peut pas être lu, on
+ne sait pas à quel ED3 appartiennent les appareils. Rien ne prouve que c’en
+est un autre : les extinctions partent, vers l’adresse saisie ; l’allumage
+et les valeurs restent refusés jusqu’à « Rattacher les appareils » (deux
+clics), et l’état le dit. Tant que `/data` ne peut être ni lu ni écrit,
+« Rattacher » est refusé lui aussi (il ne serait pas gardé). Une lecture ou une écriture de
 `/data` qui ne répond pas en 5 s compte comme un échec : elle ne retient ni
 les lectures ni les commandes.
 

@@ -156,6 +156,26 @@ output-index` (never an energy-sensor index: it would be counted as
   `currentGuard`, also checked by `indexStates`), R17 and R24 (as the review
   classed them).
 
+## Decisions after the review r2 (2026-10-30)
+
+- **I-4**: owner unknown with devices there (/data deleted, empty, restored on
+  another machine, unreadable or never written): a switch-off goes to the
+  address typed, whatever /data; switching on and the values wait for
+  "Attach the devices". Refusals only on proof: another MAC, another GCE box,
+  a duplicate slot.
+- **m-9**: a slot n > 1 that read a MAC waits (25 s at most) for the first
+  round of every earlier slot before it binds, offers or publishes anything.
+- **m-10**: the pause of a duplicate slot keeps its earlier slot in /data
+  (`code: 'duplicate', of`): said again at start; a slot without device nor
+  owner says "Connecting", never "/data lost".
+- **m-11**: the counters fed by a clamp holding an index are named in the
+  status.
+- **m-12**: tests for N17 and N18 (test/review-r2.test.js).
+- **m-13**: a save still hanging makes the next ones fail at once (no second
+  5 s wait); a switch-off clicked while the start waits for /data says so.
+- **m-14**: after "Attach the devices" by the address, the first MAC read
+  becomes the identity without comparison (documented).
+
 ## Decisions after the review r1 (2026-10-30)
 
 - **I-1**: no file, devices there, and the first save at start failing:

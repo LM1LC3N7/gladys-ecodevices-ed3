@@ -56,6 +56,19 @@ export class Ed3Hub {
         }
         return undefined;
       },
+      /** The first round of every earlier slot (read or failed), `ms` at most. */
+      waitEarlier: (slot, timers, ms) => {
+        const earlier = [...this.controllers]
+          .filter(([other]) => other < slot)
+          .map(([, app]) => app.firstRound);
+        let timer;
+        return Promise.race([
+          Promise.all(earlier),
+          new Promise((resolve) => {
+            timer = timers.setTimeout(resolve, ms);
+          }),
+        ]).finally(() => timers.clearTimeout(timer));
+      },
     };
     for (let slot = 1; slot <= slots; slot += 1) {
       this.controllers.set(

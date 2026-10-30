@@ -426,7 +426,7 @@ test('after a failed round, a switch-off reads the MAC first: another ED3 there 
   app.stop();
 });
 
-test('/data lost (a fresh file) with devices there: not bound to whatever answers, Attach asked', async () => {
+test('/data lost (a fresh file) with devices there: not bound to whatever answers, switch-offs only, Attach asked', async () => {
   const device = switchOf('r1');
   const counter = created('counter', 'c0');
   const { app, gladys, store, start, cmd, world } = await setup({
@@ -439,10 +439,12 @@ test('/data lost (a fresh file) with devices there: not bound to whatever answer
   assert.equal(store.data.owner, null);
   assert.match(message(gladys), /not known to belong to the Eco-Devices 3 read/);
   assert.equal(gladys.fake.lastState(F('counter', 'c0', 'index')), undefined, 'no value');
-  for (const value of [0, 1]) {
-    assert.equal((await cmd(device, F('relay', 'r1', 'switch'), value)).success, false);
-  }
+  // Nothing proves another ED3: the switch-off goes to the address typed (I-4), not a switch-on.
+  assert.equal((await cmd(device, F('relay', 'r1', 'switch'), 1)).success, false);
   assert.equal(world.writes().length, 0);
+  world.relays[0] = true;
+  assert.equal((await cmd(device, F('relay', 'r1', 'switch'), 0)).success, true);
+  assert.equal(world.relays[0], false);
   await gladys.fake.action('attach_devices', { ed3: '1' });
   await gladys.fake.action('attach_devices', { ed3: '1' });
   assert.equal((await cmd(device, F('relay', 'r1', 'switch'), 1)).success, true);

@@ -267,6 +267,11 @@ export const T = {
       `Switch-off clicked before the configuration was read, not sent (relay not listed or another Eco-Devices 3): ${list.en}.`,
       `Extinction cliquée avant la lecture de la configuration, non envoyée (relais non listé ou autre Eco-Devices 3) : ${list.fr}.`,
     ),
+  clampCounters: (list) =>
+    both(
+      `${list.en} (fed by a clamp): not offered until their unit is confirmed.`,
+      `${list.fr} (alimentés par un tore) : non proposés tant que leur unité n’est pas confirmée.`,
+    ),
   indexHeld: (list) =>
     both(
       `Index held back (a jump or a drop, not sent to Gladys): ${list.en}. Only if it is right (a counter reset on the ED3), click "Accept the held index" twice: an accepted jump is counted in full by Gladys, at once.`,
@@ -309,8 +314,8 @@ export const T = {
   },
   notAttached: (slot) =>
     both(
-      `The devices of ED3 #${slot} are not known to belong to the Eco-Devices 3 read (the state in /data was lost): none of their values is published nor commands sent. If they are its own, click "Attach the devices" twice.`,
-      `Rien ne dit que les appareils de l’ED3 n°${slot} appartiennent à l’Eco-Devices 3 lu (l’état de /data a été perdu) : aucune de leurs valeurs n’est publiée ni commande envoyée. Si ce sont les siens, cliquez deux fois « Rattacher les appareils ».`,
+      `The devices of ED3 #${slot} are not known to belong to the Eco-Devices 3 read (the state in /data was lost, or restored without it): none of their values is published, only switch-offs are sent, to the address typed. If they are its own, click "Attach the devices" twice.`,
+      `Rien ne dit que les appareils de l’ED3 n°${slot} appartiennent à l’Eco-Devices 3 lu (l’état de /data a été perdu, ou restauré sans lui) : aucune de leurs valeurs n’est publiée, seules les extinctions sont envoyées, à l’adresse saisie. Si ce sont les siens, cliquez deux fois « Rattacher les appareils ».`,
     ),
   ownerUnreadable: both(
     'The state in /data cannot be read: which Eco-Devices 3 the devices belong to is unknown, only switch-offs are sent until it can.',
@@ -518,6 +523,10 @@ export const ERRORS = {
   keptUntilConfig: both(
     'Not sent yet: the configuration is being read from Gladys; kept and sent as soon as it is read.',
     'Pas encore envoyée : la configuration est en cours de lecture dans Gladys ; gardée et envoyée dès sa lecture.',
+  ),
+  keptUntilStart: both(
+    'Not sent yet: the integration is starting (/data does not answer yet); kept and sent as soon as the start ends (5 s at most).',
+    'Pas encore envoyée : l’intégration démarre (/data ne répond pas encore) ; gardée et envoyée dès la fin du démarrage (5 s au plus).',
   ),
   protectiveKept: (reason) =>
     both(

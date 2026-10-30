@@ -176,8 +176,13 @@ export function normalizeMemory(raw, now = Date.now()) {
     memory.pause = {
       until: Math.min(p.until, now + TIMINGS.pauseMax),
       failures: Number.isInteger(p.failures) && p.failures >= 0 ? Math.min(p.failures, 10) : 0,
-      code: p.code === 'busy' ? 'busy' : 'failed',
+      code: ['busy', 'duplicate'].includes(p.code) ? p.code : 'failed',
     };
+    // The earlier slot holding the same ED3 (a pause of a duplicate slot).
+    if (memory.pause.code === 'duplicate') {
+      if ([1, 2].includes(p.of)) memory.pause.of = p.of;
+      else memory.pause.code = 'failed';
+    }
   }
   const r = raw?.refused;
   if (

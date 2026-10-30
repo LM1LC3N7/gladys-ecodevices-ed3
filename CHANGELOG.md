@@ -31,5 +31,7 @@ the notes of the version's GitHub Release.
   another name) is refused: its counters would be counted twice.
 - A /data that was never writable, or that hangs, no longer blocks: only
   switch-offs leave while the owner of the devices is unknown.
+- With the owner of the devices unknown (/data deleted or restored on
+  another machine), switch-offs still go to the address typed.
 - Counters fed by a current clamp are not offered until their unit (Wh or
   mWh) is confirmed; the clamp power stays.

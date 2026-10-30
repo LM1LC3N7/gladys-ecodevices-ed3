@@ -202,6 +202,10 @@ export class Ed3App {
     this.peers = peers;
     /** The earlier slot this one duplicates (same address, or same MAC read); undefined if none. */
     this.duplicateOf = undefined;
+    /** Settled by the first round of each start (src/hub.js waits for it, see succeeded). */
+    this.firstRound = new Promise((resolve) => {
+      this.firstRoundResolve = resolve;
+    });
     // The budget of 300 states a minute counts on the monotonic clock; shared by the slots
     // when given (src/hub.js starts and stops it then).
     this.ownPublisher = !publisher;
@@ -507,6 +511,7 @@ export class Ed3App {
     if (this.ownPublisher) this.publisher.start();
     const missing = this.configMessage();
     if (missing) {
+      this.firstRoundDone();
       this.verdict = 'unbound';
       await this.setStatus(false, missing);
       // Nothing read: the Discover list of the previous configuration goes.
@@ -556,7 +561,12 @@ export class Ed3App {
     if (generation !== this.generation) return;
     if (this.refusedApplies()) {
       await this.setStatus(false, T.refused);
-    } else if (this.verdict === 'different' || this.verdict === 'unbound') {
+    } else if (this.duplicateOf !== undefined) {
+      await this.setStatus(false, T.duplicateSlot(this.duplicateOf, true));
+    } else if (
+      this.verdict === 'different' ||
+      (this.verdict === 'unbound' && this.createdDevices().length > 0)
+    ) {
       // Known before any read: said at once, not at the next round.
       await this.setStatus(false, this.statusMessage());
     } else {
@@ -589,8 +599,13 @@ export class Ed3App {
         due: mono + (saved.pause.until - now),
         failures: saved.pause.failures,
         code: saved.pause.code,
+        ...(saved.pause.of ? { of: saved.pause.of } : {}),
       };
       this.failures = saved.pause.failures;
+      // Paused as the same ED3 as an earlier slot: still said so until a round says otherwise.
+      if (saved.pause.code === 'duplicate' && this.duplicateOf === undefined) {
+        this.duplicateOf = saved.pause.of;
+      }
     }
     // The ED3's relays are known before the first read: a switch-off can leave at once.
     for (let n = 1; n <= LIMITS_ED3.relays; n += 1) {
@@ -695,6 +710,10 @@ export class Ed3App {
     this.otherDevice = undefined;
     this.duplicateOf = this.config.duplicateOf;
     this.peers?.macSeen(this.slot, undefined);
+    // Resolved by the first round of this start (or a start that reads nothing): see succeeded.
+    this.firstRound = new Promise((resolve) => {
+      this.firstRoundResolve = resolve;
+    });
     this.indexGuards.clear();
     this.indexMeta.clear();
     this.lastIndexAt = undefined;
@@ -761,6 +780,7 @@ export class Ed3App {
           until: now + Math.max(0, this.pause.due - mono),
           failures: this.failures,
           code: this.pause.code,
+          ...(this.pause.of ? { of: this.pause.of } : {}),
         }
       : null;
     this.memory.guards = [...this.guards.values()].slice(0, LIMITS.guards).map((g) => ({
@@ -812,9 +832,22 @@ export class Ed3App {
     }
     this.syncMemory();
     try {
+      // A save still hanging: no other one waits behind it (a round, the test button, a
+      // command never wait 5 s again for the same frozen /data).
+      if (this.saveStuck) throw Object.assign(new Error('stuck'), { code: 'timeout' });
       // Bounded: a save that hangs never holds a round, a command or the status; it is a
       // failure (no index sent, said in the status) until a save succeeds again.
-      if ((await this.bounded(this.store.save(this.memory))) === LATE) {
+      const save = this.store.save(this.memory);
+      if ((await this.bounded(save)) === LATE) {
+        this.saveStuck = true;
+        save.then(
+          () => {
+            this.saveStuck = false;
+          },
+          () => {
+            this.saveStuck = false;
+          },
+        );
         throw Object.assign(new Error('late'), { code: 'timeout' });
       }
       this.storeLost = false;
@@ -830,6 +863,11 @@ export class Ed3App {
       }
       return false;
     }
+  }
+
+  /** The first round of this start ended (read, failed, or none to make). */
+  firstRoundDone() {
+    this.firstRoundResolve?.();
   }
 
   /** `promise`, or LATE once TIMINGS.storeWait has passed (its later outcome ignored). */
@@ -999,6 +1037,7 @@ export class Ed3App {
     if (ed3.error) throw new Ed3Error(ed3.error, 'not an Eco-Devices 3 answer', { sent: true });
     const targets = new Map(ed3.targets);
     const unreadTypes = [];
+    let clampSkipped = [];
     const mono = this.monotonic();
     if (this.namesAt === undefined || mono - this.namesAt >= TIMINGS.namesInterval) {
       const names = await this.secondary(() => client.counterNames(PRIORITY.READ, hooks()));
@@ -1029,11 +1068,19 @@ export class Ed3App {
         continue;
       }
       for (const [code, target] of parsed.targets) targets.set(code, target);
+      if (parsed.skipped) clampSkipped = parsed.skipped;
     }
-    return { targets, at, unreadTypes, seen: this.seenOf(mac), mac };
+    return { targets, at, unreadTypes, seen: this.seenOf(mac), mac, clampSkipped };
   }
 
-  async succeeded({ targets, at, unreadTypes, seen, mac }) {
+  async succeeded({ targets, at, unreadTypes, seen, mac, clampSkipped = [] }) {
+    const generation = this.generation;
+    // The earlier slots first read their own ED3 (bounded): a slot later in the list is never
+    // taken, offered nor published before a duplicate of an earlier one can be told.
+    if (mac && this.slot > 1 && this.peers?.waitEarlier) {
+      await this.peers.waitEarlier(this.slot, this.timers, TIMINGS.roundBudget);
+      if (generation !== this.generation) return;
+    }
     // The same ED3 (its MAC, memory only) already in an earlier slot: this one is not used (its
     // consumption would be counted twice); read again every few minutes only.
     const duplicate = mac ? this.peers?.duplicateOf(this.slot, mac) : undefined;
@@ -1046,14 +1093,17 @@ export class Ed3App {
       this.offline = true;
       this.otherDevice = undefined;
       this.dropGuards('the same ED3 as an earlier slot');
-      this.setPause(this.monotonic(), TIMINGS.duplicatePause, 'failed');
+      this.setPause(this.monotonic(), TIMINGS.duplicatePause, 'duplicate');
+      this.pause.of = duplicate;
       await this.saveMemory();
+      this.firstRoundDone();
       await this.setStatus(false, T.duplicateSlot(duplicate, true));
       await this.publishDevices();
       return;
     }
     this.duplicateOf = this.config.duplicateOf;
     if (mac) this.peers?.macSeen(this.slot, mac);
+    this.firstRoundDone();
     this.pause = undefined;
     this.failures = 0;
     this.offline = false;
@@ -1067,7 +1117,7 @@ export class Ed3App {
     for (const [code, target] of targets) {
       this.model.set(code, { ...target, at });
     }
-    this.round = { unreadTypes };
+    this.round = { unreadTypes, clampSkipped };
     // Which ED3 answered, against the owner of the devices, before anything is published.
     this.seen = seen;
     this.applyVerdict(this.judge(seen));
@@ -1083,6 +1133,7 @@ export class Ed3App {
 
   /** The round failed: a pause; a refused key stops the reads; `other`: another GCE box answers. */
   async failed(err, mono, other) {
+    this.firstRoundDone();
     if (other) {
       // Not a refused key nor an outage: this address is not an ED3. A pause as a failure,
       // nothing published from it.
@@ -1193,6 +1244,9 @@ export class Ed3App {
     }
     const held = this.heldEntries();
     if (held.length > 0) parts.push(T.indexHeld(heldList(held)));
+    if (this.round?.clampSkipped?.length > 0) {
+      parts.push(T.clampCounters(listOf(this.round.clampSkipped.map((n) => `C${n}`))));
+    }
     const faults = [...this.model.values()].filter((t) => t.fault === true);
     if (faults.length > 0) {
       parts.push(T.thlFault(listOf(faults.map((t) => shownCode(t.code)))));
@@ -1555,8 +1609,9 @@ export class Ed3App {
       case 'unverified':
         return protective && this.memory.owner?.at === this.config.key;
       case 'unbound':
-        // /data unreadable or never written: owner unknown, the switch-offs go to the address typed.
-        return protective && this.ownerUnknown;
+        // Owner unknown (/data unreadable, never written, deleted, restored elsewhere): nothing
+        // proves another ED3, so a switch-off goes to the address typed, nothing else.
+        return protective;
       default:
         return false;
     }
@@ -2118,6 +2173,8 @@ export class Ed3App {
         else if (pending) pending.waiting = false;
       }
       if (!ready) {
+        // The configuration read, the start waiting for /data: said as such.
+        if (pending && this.configLoaded) throw this.refusal(ERRORS.keptUntilStart);
         if (pending) throw this.refusal(ERRORS.keptUntilConfig);
         throw this.refusal(ERRORS.configNotLoaded);
       }

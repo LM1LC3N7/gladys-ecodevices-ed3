@@ -189,12 +189,17 @@ export function parseCounters(json, names, clampCounters) {
   if (!items) return { error: 'bad_response' };
   const targets = new Map();
   const seen = new Set();
+  /** Counters fed by a clamp that hold an index: not offered, named in the status. */
+  const skipped = [];
   for (const item of items) {
     const n = counterNumber(own(item, '_id'));
     if (n === undefined || seen.has(n)) continue;
     seen.add(n);
     // Fed by a clamp: its unit is not confirmed (Wh or mWh): never an index (TODO.md).
-    if (clampCounters?.has(n)) continue;
+    if (clampCounters?.has(n)) {
+      if (indexValue(own(item, 'index'), counterKind(n)) !== undefined) skipped.push(n);
+      continue;
+    }
     const kind = counterKind(n);
     const value = indexValue(own(item, 'index'), kind);
     targets.set(`c${n}`, {
@@ -208,7 +213,7 @@ export function parseCounters(json, names, clampCounters) {
       idle: value === undefined,
     });
   }
-  return { targets };
+  return { targets, skipped: skipped.sort((a, b) => a - b) };
 }
 
 /** `ebx/x8r` -> Map(code -> target): the 8 outputs of each X-8R paired (read only). */
