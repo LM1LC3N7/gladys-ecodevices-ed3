@@ -265,3 +265,10 @@ output-index` (never an energy-sensor index: it would be counted as
 ## Next patch (review r4, 0436564)
 
 - m-18: a request that leaves ahead of a polling round drops the whole round; only the relay states (and the MAC after an identity check) are stale. Apply counters, clamps, voltage and X-THL, skip only those, and add a test (reviewer's r4-steady.mjs: commands every 2 s apply 2 of 7 rounds).
+
+## Next patch (review cce66 r1, 17fd6ae)
+
+- m-19: the water unit (mL) is plausible, not checked against the meter: say "plausible, not compared with the meter" in `docs/en.md:73-76`, `docs/fr.md:78-82`, `CHANGELOG.md`, line 184 above, until cce66 compares counter 25 with his water meter.
+- m-20: "the clamp power is confirmed" (`docs/en.md:91`, `docs/fr.md:90`) reads as confirmed by a real device: it rests on GCE and the Api-Deck only. Also say that the MAC replayed in the tests is invented.
+- m-21: `test/cce66.test.js:108` and `:138`: move `app.stop()` into `t.after`.
+- Before lifting the clamp-counter guard: `parseEd3` holds the clamp counters only when `ID_Logger_tore` lists `_id`s (851968 + n). If the real ED3 lists 0-29 instead, the list counts as given and C11-C24 would be published in the assumed Wh. Check the format in cce66's `object/ed3/0` answer first.
