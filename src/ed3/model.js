@@ -59,8 +59,9 @@ const paired = (codeExt) =>
 /**
  * The MAC address of a `system/info` answer, lower case with colons;
  * undefined when absent, malformed, all zeros or all ones (no identity,
- * never "another ED3"). The field is not documented for the ED3: the names
- * of the IPX800 V5 (`macAdress`, same firmware family) and the usual ones.
+ * never "another ED3"). A real ED3 (firmware 1.3.0) gives `macAdress` as
+ * "XX-XX-XX-XX-XX-XX" (dashes, upper case), as the IPX800 V5; the usual
+ * other names are tried too.
  */
 export function parseMac(json) {
   if (!isObject(json)) return undefined;

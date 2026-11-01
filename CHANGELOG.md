@@ -10,6 +10,15 @@ the notes of the version's GitHub Release.
 
 ## [Unreleased]
 
+### Changed
+
+- Checked against the answers of a real Eco-Devices 3 (firmware 1.3.0): its
+  MAC address (`macAdress`, with dashes) is its identity, a list of fewer
+  than 30 counters is read by their ids, the teleinfo indexes are in Wh and
+  the water ones in mL as assumed; replayed in the tests. The counters fed by
+  a clamp stay not offered until their unit is compared with the ED3's page.
+  Docs say so.
+
 ## [0.1.1] - 2026-10-30
 
 ### Added

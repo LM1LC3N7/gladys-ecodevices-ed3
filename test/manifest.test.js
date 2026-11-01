@@ -30,7 +30,6 @@ test('the store basics, the same version everywhere (semver, never pinned), no k
   assert.equal(manifest.type, 'device');
   assert.equal(manifest.gladys_version, '>=5.1.0');
   assert.match(manifest.version, /^\d+\.\d+\.\d+$/);
-  assert.equal(manifest.version, '0.1.0', 'set once by hand, then by the Release workflow');
   assert.equal(manifest.docker_image, `ghcr.io/lm1lc3n7/gladys-ecodevices-ed3:${manifest.version}`);
   const pkg = JSON.parse(read('package.json'));
   const lock = JSON.parse(read('package-lock.json'));

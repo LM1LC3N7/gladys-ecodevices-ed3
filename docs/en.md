@@ -8,8 +8,10 @@ extensions and their X-THL sensors (temperature, humidity, luminosity).
 
 > Never tested with a real device: written from GCE's documentation of the
 > ED3 API (Postman "API ED3", linked from the ED3) and cce66's free tools
-> (ED3 Api-Deck and Mqtt-Deck). Tell us what you see on yours. Not
-> affiliated with GCE Electronics.
+> (ED3 Api-Deck and Mqtt-Deck). The answers of one real ED3 (cce66's,
+> firmware 1.3.0) are replayed in the tests: its MAC address, its counters,
+> the units of the teleinfo and water counters. Tell us what you see on
+> yours. Not affiliated with GCE Electronics.
 
 ## Setup
 
@@ -64,7 +66,14 @@ The counter numbers are the ED3's (GCE assigns them by category). The names
 you gave them on the ED3 are used in Discover (read again every 10
 minutes); a name changed later on the ED3 does not rename a device already
 created. A counter at 0 (not set up, or not read by the ED3 yet) is not
-offered; a clamp without a counter neither.
+offered; a clamp without a counter neither. The ED3 may list fewer than 30
+counters (a real one listed 26): a counter is known by its ED3 id, never
+by its place in the list, and one not listed is not offered.
+
+Units: the teleinfo indexes are in Wh on the ED3 (checked on a real one:
+its counter 0 matched, within a few minutes, the same Linky read by an
+Eco-Devices RT2), published in kWh; water and gas in mL, published in m³
+(a real water counter: 60,707,000 mL = 60.707 m³).
 
 The ED3 is read every 15 seconds by default (10 s at least). A value the
 ED3 does not give (absent, a text, out of range, a voltage of 0 V) is not
@@ -76,8 +85,12 @@ offered.
 (¹) **A counter fed by a clamp is not offered in this version** (those the
 ED3 links to a clamp in `ID_Logger_tore`): the unit of its index is not
 confirmed (Wh says GCE, but GCE's own example suggests mWh, which would make
-values 1000 times too large). The power of the clamp is confirmed (mW,
-published in W). It will be offered once the unit is checked on a real ED3.
+values 1000 times too large). The values of a real ED3 lean to Wh, but were
+not compared with the ED3's own page, and that ED3 did not say which
+counters its clamps feed: a lifetime index 1000 times off would stay in the
+energy history of Gladys, so they wait for that check. The power of the
+clamp is confirmed (mW, published in W). They will be offered once the unit
+is checked on a real ED3.
 The status names those holding an index ("C12, C13 (fed by a clamp): not
 offered until their unit is confirmed"). An ED3 that does not give that list
 does not say which counters its clamps feed: the source of counters 11 to 24
@@ -205,10 +218,11 @@ keeps, in `/data`, which ED3 the devices of each slot belong to:
 
 - by its **MAC address** when `GET /api/system/info` gives one (read again
   every round, kept as a salted fingerprint, never in clear);
-- otherwise by its **address and port**. **Limit**: the ED3 API documents no
-  MAC address; when it gives none, another ED3 put at the same address is
-  not told apart from yours, and a change of address needs "Attach the
-  devices".
+- otherwise by its **address and port**. **Limit**: GCE does not document
+  the MAC address (a real ED3, firmware 1.3.0, gives it as `macAdress`,
+  `XX-XX-XX-XX-XX-XX`); an ED3 that gives none is not told apart from
+  another one put at the same address, and a change of address needs
+  "Attach the devices".
 
 If the ED3 read is not theirs: no command leaves for it, not even a
 switch-off; the switch-offs kept for the old one are dropped; none of its

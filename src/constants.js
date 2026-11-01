@@ -10,15 +10,19 @@
 //     clamp, 0 = none), `puissance` (8, mW), `urms` (V);
 //     `?option=filter_state` the states only (the read back of a relay);
 //   - `object/ed3/0/SetOnR/<1|2>` / `SetOffR/<1|2>` (GET): one relay on / off;
-//   - `object/core_logger?option=filter_state`: the 30 counters
-//     `{ _id, index, indexprix, moyenne, instMax, instMin, tarif }`, `index`
-//     in Wh (electricity) or mL (water, gas), "strictly increasing";
+//   - `object/core_logger?option=filter_state`: the counters (up to 30; a
+//     real ED3, firmware 1.3.0, listed 26: an entry may be missing, a counter
+//     is known by its `_id` only) `{ _id, index, indexprix, moyenne, instMax,
+//     instMin, tarif }`, `index` in Wh (electricity) or mL (water, gas),
+//     "strictly increasing";
 //     `?option=filter_name`: `{ _id, name }`;
 //   - `ebx/x8r`: the X-8R extensions `{ _id, name, codeExt, state[8], command[8] }`;
 //   - `ebx/xthl`: the X-THL `{ _id, name, codeExt, Temperature, Humidite,
 //     Luminosite, ioFault }`;
-//   - `system/info`: hostname, firmware... (its fields are not documented: a
-//     MAC address is looked for there, see src/ed3/model.js).
+//   - `system/info`: `productName` "ECODEVICES3", `macAdress`
+//     ("XX-XX-XX-XX-XX-XX"), `hostName`, `firmwareVersion` ("1.3.0 ", with a
+//     trailing space), `compiled` (a real ED3, cce66, 2026-10-31); only the
+//     MAC is used (src/ed3/model.js).
 // The API key travels in the query string: a URL is never logged, nor put in
 // an error, a status or /data.
 //

@@ -87,6 +87,11 @@ export function fakeEd3(options = {}) {
     failReads: undefined,
     /** Another GCE box at the address: 'ipx800v5' | 'xdevices' (IPX800 V4, Eco-Devices RT2). */
     other: undefined,
+    /**
+     * Raw answers of a real ED3, by path (`system/info`, `object/core_logger?option=filter_state`):
+     * served as they are instead of the built ones (test/fixtures/cce66-ed3.js).
+     */
+    answers: new Map(),
     /** Paths that fail: `ebx/x8r` -> status (`object/core_logger` too). */
     failPaths: new Map(),
     sleep(ms) {
@@ -177,6 +182,8 @@ function respond(world, record) {
 
 function ed3(world, method, path, option) {
   if (method !== 'GET') return json({}, 400);
+  const raw = world.answers.get(option ? `${path}?option=${option}` : path);
+  if (raw !== undefined) return json(typeof raw === 'function' ? raw() : raw);
   if (path === 'system/info') {
     return json({
       hostName: 'ECODEVICES3',

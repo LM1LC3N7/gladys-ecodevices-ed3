@@ -8,8 +8,10 @@ leurs capteurs X-THL (température, humidité, luminosité).
 
 > Jamais testé avec un vrai appareil : écrit d’après la documentation de
 > l’API ED3 de GCE (Postman « API ED3 », liée depuis l’ED3) et les outils
-> libres de cce66 (Api-Deck et Mqtt-Deck ED3). Dites-nous ce que vous voyez
-> sur le vôtre. Sans lien avec GCE Electronics.
+> libres de cce66 (Api-Deck et Mqtt-Deck ED3). Les réponses d’un vrai ED3
+> (celui de cce66, firmware 1.3.0) sont rejouées dans les tests : son
+> adresse MAC, ses compteurs, les unités des compteurs téléinfo et eau.
+> Dites-nous ce que vous voyez sur le vôtre. Sans lien avec GCE Electronics.
 
 ## Installation
 
@@ -69,13 +71,25 @@ catégorie). Les noms que vous leur avez donnés sur l’ED3 sont repris dans
 Découverte (relus toutes les 10 minutes) ; un nom changé ensuite sur l’ED3
 ne renomme pas un appareil déjà créé. Un compteur à 0 (pas configuré, ou pas
 encore lu par l’ED3) n’est pas proposé ; un tore sans compteur non plus.
+L’ED3 peut lister moins de 30 compteurs (un vrai en listait 26) : un
+compteur est reconnu par son identifiant ED3, jamais par sa place dans la
+liste, et un compteur absent de la liste n’est pas proposé.
+
+Unités : les index téléinfo sont en Wh sur l’ED3 (vérifié sur un vrai : son
+compteur 0 recoupait, à quelques minutes près, le même Linky lu par un
+Eco-Devices RT2), publiés en kWh ; l’eau et le gaz en mL, publiés en m³ (un
+vrai compteur d’eau : 60 707 000 mL = 60,707 m³).
 
 (¹) **Un compteur alimenté par un tore n’est pas proposé dans cette version**
 (ceux que l’ED3 relie à un tore dans `ID_Logger_tore`) : l’unité de son
 index n’est pas confirmée (Wh selon GCE, mais l’exemple de GCE lui-même fait
-penser à des mWh, ce qui donnerait des valeurs 1000 fois trop grandes). La
-puissance du tore, elle, est confirmée (mW, publiée en W). Il le sera une
-fois l’unité vérifiée sur un vrai ED3. L’état nomme ceux qui ont un index
+penser à des mWh, ce qui donnerait des valeurs 1000 fois trop grandes). Les
+valeurs d’un vrai ED3 penchent pour le Wh, mais n’ont pas été comparées à
+la page de l’ED3, et cet ED3 n’a pas dit quels compteurs ses tores
+alimentent : un index à vie 1000 fois faux resterait dans l’historique
+d’énergie de Gladys, donc ils attendent cette vérification. La puissance du
+tore, elle, est confirmée (mW, publiée en W). Ils seront proposés une fois
+l’unité vérifiée sur un vrai ED3. L’état nomme ceux qui ont un index
 (« C12, C13 (alimentés par un tore) : non proposés tant que leur unité n’est
 pas confirmée »). Un ED3 qui ne donne pas cette liste ne dit pas quels
 compteurs ses tores alimentent : la source des compteurs 11 à 24 est alors
@@ -217,10 +231,11 @@ les appareils de chaque emplacement :
 
 - par son **adresse MAC** si `GET /api/system/info` en donne une (relue à
   chaque lecture, gardée sous forme d’empreinte salée, jamais en clair) ;
-- sinon par son **adresse et son port**. **Limite** : l’API de l’ED3 ne
-  documente pas d’adresse MAC ; s’il n’en donne pas, un autre ED3 mis à la
-  même adresse ne se distingue pas du vôtre, et un changement d’adresse
-  demande « Rattacher les appareils ».
+- sinon par son **adresse et son port**. **Limite** : GCE ne documente pas
+  l’adresse MAC (un vrai ED3, firmware 1.3.0, la donne en `macAdress`,
+  `XX-XX-XX-XX-XX-XX`) ; un ED3 qui n’en donne pas ne se distingue pas d’un
+  autre mis à la même adresse, et un changement d’adresse demande
+  « Rattacher les appareils ».
 
 Si l’ED3 lu n’est pas le leur, alors : aucune commande ne part vers lui, pas
 même une extinction ; les extinctions gardées pour l’ancien sont

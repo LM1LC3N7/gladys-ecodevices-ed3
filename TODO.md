@@ -16,8 +16,9 @@ to date at the end of every milestone.
       against an in-memory ED3 on a virtual clock, and a real local HTTP
       server on a real clock (x20). Never tested with a real device.
 - [ ] **Review** (xhigh: relays, energy indexes), then corrections.
-- [ ] **First real device**: cce66 (forum t/11448), who has the boxes; the
-      questions below.
+- [ ] **First real device**: cce66 (forum t/11448), who has the boxes:
+      his answers of 2026-10-31 received (identity, counters, units of the
+      teleinfo and water), replayed in the tests; the questions left below.
 - [ ] **Milestone 2**: the teleinfo frame (`object/tic/0?option=filter_state`:
       `SINSTS` apparent power for the energy contracts, the current tariff
       `LTARF` / `NTARF`), X-8R commands once their path is confirmed, the
@@ -47,7 +48,8 @@ Confirmed by both (used):
   W, `relay_state/<n>` 0/1.
 - `GET object/ed3/0/SetOnR/<n>`, `SetOffR/<n>`, `ToggleR/<n>` (GET, n = 1 or
   2). Only SetOnR / SetOffR are used (absolute).
-- `GET object/core_logger?option=filter_state`: 30 counters `{ _id, index,
+- `GET object/core_logger?option=filter_state`: up to 30 counters (a real
+  ED3 listed 26) `{ _id, index,
 indexprix, moyenne, instMax, instMin, tarif }`, `_id` = 851968 + n; GCE:
   `index` "strictly increasing" in Wh (electricity) or mL (water, gas);
   `?option=filter_name` (`{ _id, name }`) is in cce66's Api-Deck only (not
@@ -60,35 +62,46 @@ indexprix, moyenne, instMax, instMin, tarif }`, `_id` = 851968 + n; GCE:
   `GET ebx/xthl` (`_id`, `name`, `codeExt`, `Temperature`, `Humidite`,
   `Luminosite`, `ioFault`).
 
-## Questions for cce66 (his ED3)
+## Answers of cce66 (t/11448 post 7, 2026-10-31)
 
-1. The answer of `GET /api/system/info?ApiKey=…` (key removed): is there a
-   MAC address, under which name (`macAdress` as the IPX800 V5)? Without it,
-   the ED3 is known by its address only (the limit in the docs).
-2. `GET /api/object/core_logger?option=filter_state`: the `index` of a
-   teleinfo counter against the ED3's own page: Wh as GCE writes (22534 =
-   22.534 kWh), or kWh / something else? And for a water counter: mL (GCE's
-   Core Logger `unit` says "1 for litres")? **And one counter fed by a clamp
-   (one listed in `ID_Logger_tore`) against the ED3's page**: Wh or mWh?
-   GCE's own example has counters 11, 12, 19 to 23 near 407 million for
-   clamps reading 56 W and 2 W (407 MWh in Wh), and `conso` per clamp is in
-   mWh. Until he answers, the counters fed by a clamp are not offered (r1
-   m-8); to be settled before any release to the store.
-3. An unused counter: `index` 0 and the name empty (or "Compteur n")? Does
-   the list always hold 30 entries?
-4. Storage: is it 22 charge, 23-24 discharge (Mqtt-Deck) or 22-24 "storage"
-   (GCE)? Published here as plain sensors either way.
-5. `GET /api/ebx/x8r/<n>/SetOnR/<k>`: is `<n>` the position in the list (0
-   in both examples) or the `_id` (4259840)? Until then the X-8R outputs are
-   read only.
-6. An X-8R or X-THL not paired: is its `codeExt` "0" (the GCE X-THL example)
-   or empty? Such an object is not offered here.
-7. A clamp measuring a production (solar): is `puissance` negative?
-8. What does `SetOnR/1` answer (a body, a status)? Taken as accepted on any
-   2xx, confirmed by the read back.
-9. Does the ED3 answer HTTPS only on some firmwares (the Api-Deck offers
-   both)? http only here.
-10. The status line and the names in Discover: clear enough in his words?
+His ED3, firmware 1.3.0, replayed in test/cce66.test.js (fixtures in
+test/fixtures/cce66-ed3.js, his masked MAC replaced by an invented one):
+
+- [x] Q1 `system/info`: `macAdress` "XX-XX-XX-XX-XX-XX" (dashes, upper
+      case), `productName` "ECODEVICES3", `firmwareVersion` "1.3.0 " (a
+      trailing space). The MAC is the identity (`parseMac` already took
+      dashes); the firmware is neither shown nor compared anywhere.
+- [x] Q2, teleinfo and water: counter 0 = 132 533 861, his Eco-Devices RT2
+      read the same Linky at 132 533 718 a few minutes apart (143 apart, an
+      average of 811 W: about 10 minutes in Wh, impossible in kWh): **Wh**,
+      published in kWh. Water (counter 25) 60 707 000: mL as GCE says,
+      60.707 m³, plausible; published in m³ (`volume-sensor`).
+- [ ] Q2, clamps: not settled (no `object/ed3/0`, no comparison with the
+      ED3's page). Held, see "Decisions after cce66's answers".
+- [x] Q3: unused counters at 0 (index and all fields); **not always 30
+      entries**: his list has 26 (851986, 851989, 851992, 851995 missing:
+      counters 18, 21, 24, 27). The number of a counter is its `_id` -
+      851968, never its place (already so; now tested on his list).
+- [ ] Q4 to Q10: no answer (his X-8R is to be rewired). Not asked again,
+      their default being safe: Q4 storage 22 charge / 23-24 discharge or
+      22-24 storage (plain sensors either way), Q6 `codeExt` of an object
+      not paired ("0" or empty: neither offered), Q8 the body of `SetOnR`
+      (any 2xx, the read back confirms), Q9 HTTPS (http only).
+
+## Questions left for cce66 (short, for the forum)
+
+1. L’adresse `http://<ED3>/api/object/ed3/0?ApiKey=…` (clé retirée) : la
+   réponse complète, surtout `ID_Logger_tore` et `ToreName`. Elle dit quels
+   compteurs viennent de vos pinces.
+2. Pour un de ces compteurs de pince (par exemple le 11, index 3 293 592) :
+   quelle valeur affiche la page de l’ED3, et dans quelle unité (kWh, Wh) ?
+3. Une fois le X-8R recâblé : l’adresse `…/api/ebx/x8r?ApiKey=…`, puis
+   `…/api/ebx/x8r/0/SetOnR/1?ApiKey=…` allume-t-elle la sortie 1 (0 = la
+   place dans la liste), ou faut-il `…/api/ebx/x8r/4259840/SetOnR/1` (le
+   `_id`) ? Et ce que répond l’ED3 à cet appel.
+4. Une pince qui mesure une production (solaire) : la puissance est-elle
+   négative ?
+5. Les noms dans la Découverte et la ligne d’état : clairs pour vous ?
 
 ## Decisions
 
@@ -155,6 +168,27 @@ output-index` (never an energy-sensor index: it would be counted as
   `value > 0` after the conversion), E8 (`storeUnreadable` in
   `currentGuard`, also checked by `indexStates`), R17 and R24 (as the review
   classed them).
+
+## Decisions after cce66's answers (2026-11-01)
+
+- **Clamp counters still not offered.** His values lean to Wh: counter 11
+  = 3 293 592 with an average of 585 W is 3 294 kWh (about 235 days of
+  that average) in Wh, but 3.3 kWh (under 6 hours) in mWh; and its
+  `indexprix` gives about 59 units per price unit for the counters 11, 12,
+  13, 20, 23 (0.17 per kWh in Wh, 170 per kWh in mWh). Still not a proof:
+  no comparison with the ED3's page, the unit of `indexprix` is not
+  documented, and without `object/ed3/0` (`ID_Logger_tore`) which of his
+  counters 11 to 24 come from a clamp is not known. A lifetime index 1000
+  times off cannot be taken back from Gladys's energy history (rule:
+  units checked against the reference): held until questions 1 and 2.
+- **Teleinfo in Wh, water in mL: confirmed** (see Q2 above), no change.
+- **Fewer than 30 counters**: nothing to change (the parser numbers by
+  `_id`); docs and comments now say "up to 30".
+- **Firmware with a trailing space**: not used anywhere (only the MAC is
+  read from `system/info`); nothing to trim.
+- The fake ED3 of the tests takes raw answers by path (`world.answers`).
+- test/manifest.test.js no longer pins the version to 0.1.0: the Release
+  workflow made it 0.1.1, and CI on main failed since.
 
 ## Decisions after the review r3 (2026-10-30)
 
