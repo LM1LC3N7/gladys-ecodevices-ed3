@@ -10,6 +10,8 @@ the notes of the version's GitHub Release.
 
 ## [Unreleased]
 
+## [0.1.2] - 2026-11-01
+
 ### Changed
 
 - Checked against the answers of a real Eco-Devices 3 (firmware 1.3.0): its
@@ -53,5 +55,6 @@ the notes of the version's GitHub Release.
   (its values are older).
 - A /data load that hangs makes the next ones fail at once, as a save does.
 
-[Unreleased]: https://github.com/LM1LC3N7/gladys-ecodevices-ed3/compare/v0.1.1...HEAD
+[Unreleased]: https://github.com/LM1LC3N7/gladys-ecodevices-ed3/compare/v0.1.2...HEAD
+[0.1.2]: https://github.com/LM1LC3N7/gladys-ecodevices-ed3/compare/v0.1.1...v0.1.2
 [0.1.1]: https://github.com/LM1LC3N7/gladys-ecodevices-ed3/releases/tag/v0.1.1

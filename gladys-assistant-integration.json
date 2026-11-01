@@ -6,8 +6,8 @@
     "en": "GCE Eco-Devices 3: energy, water and gas counters, current clamps, relays, X-THL sensors.",
     "fr": "GCE Eco-Devices 3 : compteurs d’énergie, d’eau et de gaz, tores, relais, capteurs X-THL."
   },
-  "version": "0.1.1",
-  "docker_image": "ghcr.io/lm1lc3n7/gladys-ecodevices-ed3:0.1.1",
+  "version": "0.1.2",
+  "docker_image": "ghcr.io/lm1lc3n7/gladys-ecodevices-ed3:0.1.2",
   "gladys_version": ">=5.1.0",
   "cover_image": "https://raw.githubusercontent.com/LM1LC3N7/gladys-ecodevices-ed3/main/cover.png",
   "categories": ["energy", "lighting"],
