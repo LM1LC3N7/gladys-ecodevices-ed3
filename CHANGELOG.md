@@ -10,6 +10,8 @@ the notes of the version's GitHub Release.
 
 ## [Unreleased]
 
+## [0.2.1] - 2026-11-03
+
 ### Changed
 
 - The docs no longer say "Never tested with a real device": the readings are
@@ -116,7 +118,8 @@ the notes of the version's GitHub Release.
   (its values are older).
 - A /data load that hangs makes the next ones fail at once, as a save does.
 
-[Unreleased]: https://github.com/LM1LC3N7/gladys-ecodevices-ed3/compare/v0.2.0...HEAD
+[Unreleased]: https://github.com/LM1LC3N7/gladys-ecodevices-ed3/compare/v0.2.1...HEAD
+[0.2.1]: https://github.com/LM1LC3N7/gladys-ecodevices-ed3/compare/v0.2.0...v0.2.1
 [0.2.0]: https://github.com/LM1LC3N7/gladys-ecodevices-ed3/compare/v0.1.2...v0.2.0
 [0.1.2]: https://github.com/LM1LC3N7/gladys-ecodevices-ed3/compare/v0.1.1...v0.1.2
 [0.1.1]: https://github.com/LM1LC3N7/gladys-ecodevices-ed3/releases/tag/v0.1.1
