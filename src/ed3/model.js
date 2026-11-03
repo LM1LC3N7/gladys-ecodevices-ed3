@@ -89,10 +89,11 @@ function relayStates(json) {
  * `ID_Logger_pulse`): `{ ids }` (per input, the counter number or undefined for 0),
  * `{ absent: true }` or `{ bad: true }`. Only the form a real ED3 gives (firmware 1.3.0) and
  * GCE documents is taken: a list of exactly `size` entries, each 0 or a counter `_id`
- * (851968 + n). Another length, a counter number (0-29) instead of an `_id`, a text: bad
- * (another firmware), never guessed.
+ * (851968 + n), within `range` when given (a clamp feeds only 11 to 24, GCE). Another
+ * length, a counter number (0-29) instead of an `_id`, a text, a clamp linked to a teleinfo,
+ * water or gas counter: bad (another firmware), never guessed.
  */
-function linkList(value, size) {
+function linkList(value, size, range) {
   if (value === undefined) return { absent: true };
   if (!Array.isArray(value) || value.length !== size) return { bad: true };
   const ids = [];
@@ -102,7 +103,7 @@ function linkList(value, size) {
       continue;
     }
     const n = counterNumber(id);
-    if (n === undefined) return { bad: true };
+    if (n === undefined || (range && (n < range.first || n > range.last))) return { bad: true };
     ids.push(n);
   }
   return { ids };
@@ -147,12 +148,15 @@ const CLAMP_COUNTERS = { first: 11, last: 24 };
  * mains voltage; `sources`: the input feeding each counter (its name in Gladys); `held`: the
  * counters not published. An answer without `Relay_state` is not an ED3.
  *
- * The index of a counter fed by a clamp is in Wh as the others (GCE: `index` "en wH" for
- * every Core Logger; a real ED3, firmware 1.3.0: the index of its battery clamp grew 4 029
- * in the time the teleinfo grew 50 312 Wh, its 5-minute average 57 W against 811 W: Wh, not
- * mWh). That was checked with the links in the form above only: without them (absent, or in
- * another form: another firmware), the counters 11 to 24 are held as before, their source
- * unknown.
+ * The index of a counter fed by a clamp is in Wh as the teleinfo's (GCE: `index` "en wH"
+ * for the Core Loggers of the teleinfo and the clamps). Checked on a real ED3 (firmware
+ * 1.3.0): the counter of its battery clamp T7 (negative) grew 4 029 in 71 h, 56.7 W on
+ * average in Wh, while T7 read -63.8 W (`puissance`, mW, itself checked against
+ * irms x urms x cosphi) and 59 W in `objDescriptor`: Wh, never mWh (0.06 W). That was checked
+ * with the links in the form above only: without them (absent, or in another form: another
+ * firmware), the counters 11 to 24 are held as before, their source unknown. A counter fed
+ * by a pulse input is published only as water or gas (mL, checked with a meter): an
+ * electricity counter fed by one is held (parseCounters), its unit not checked.
  */
 export function parseEd3(json) {
   if (!isObject(json)) return { error: 'bad_response' };
@@ -172,8 +176,8 @@ export function parseEd3(json) {
   const rawTore = own(json, 'ID_Logger_tore');
   const rawToreNeg = own(json, 'ID_Logger_tore_neg');
   const lists = {
-    tore: linkList(rawTore, LIMITS_ED3.clamps),
-    toreNeg: linkList(rawToreNeg, LIMITS_ED3.clamps),
+    tore: linkList(rawTore, LIMITS_ED3.clamps, CLAMP_COUNTERS),
+    toreNeg: linkList(rawToreNeg, LIMITS_ED3.clamps, CLAMP_COUNTERS),
     pulse: linkList(own(json, 'ID_Logger_pulse'), LIMITS_ED3.pulses),
   };
   // The links are read when `ID_Logger_tore` has the expected form, and `ID_Logger_tore_neg`
@@ -267,6 +271,8 @@ export function parseCounters(json, names, held, sources) {
   const seen = new Set();
   /** Counters held that hold an index: not offered, named in the status. */
   const skipped = [];
+  /** Electricity counters fed by a pulse input holding an index: the same, said apart. */
+  const pulseSkipped = [];
   for (const item of items) {
     const n = counterNumber(own(item, '_id'));
     if (n === undefined || seen.has(n)) continue;
@@ -278,6 +284,11 @@ export function parseCounters(json, names, held, sources) {
     }
     const kind = counterKind(n);
     const value = indexValue(own(item, 'index'), kind);
+    // Fed by a pulse input but not water nor gas: its unit is not checked (Wh assumed): held.
+    if (sources?.get(n)?.from === 'pulse' && !isVolume(kind)) {
+      if (value !== undefined) pulseSkipped.push(n);
+      continue;
+    }
     targets.set(`c${n}`, {
       code: `c${n}`,
       kind: KINDS.COUNTER,
@@ -290,7 +301,11 @@ export function parseCounters(json, names, held, sources) {
       idle: value === undefined,
     });
   }
-  return { targets, skipped: skipped.sort((a, b) => a - b) };
+  return {
+    targets,
+    skipped: skipped.sort((a, b) => a - b),
+    pulseSkipped: pulseSkipped.sort((a, b) => a - b),
+  };
 }
 
 /** `ebx/x8r` -> Map(code -> target): the 8 outputs of each X-8R paired (read only). */

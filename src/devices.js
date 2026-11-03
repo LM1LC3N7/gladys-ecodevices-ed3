@@ -31,8 +31,9 @@
 //     or as consumption);
 //   - water (c25-c27), gas (c28, c29): `volume-sensor` in m³, never in the
 //     energy monitoring.
-// Clamps: `energy-sensor` / `power` (W, signed: the sign of a clamp reading
-// a production is not documented). The mains: `energy-sensor` / `voltage`.
+// Clamps: `energy-sensor` / `power` (W, signed: positive in the direction of
+// the clamp's `ID_Logger_tore` counter, negative in that of its
+// `ID_Logger_tore_neg` one; consumption or production is the counter's). The mains: `energy-sensor` / `voltage`.
 // Units: only those the core lists for the category.
 //
 // A device published again never loses a feature: those of the device

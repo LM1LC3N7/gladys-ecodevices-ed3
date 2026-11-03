@@ -1106,6 +1106,7 @@ export class Ed3App {
     const targets = new Map(ed3.targets);
     const unreadTypes = [];
     let heldCounters = [];
+    let pulseHeld = [];
     const mono = this.monotonic();
     if (this.namesAt === undefined || mono - this.namesAt >= TIMINGS.namesInterval) {
       const names = await this.secondary(() => client.counterNames(PRIORITY.READ, hooks()));
@@ -1137,6 +1138,7 @@ export class Ed3App {
       }
       for (const [code, target] of parsed.targets) targets.set(code, target);
       if (parsed.skipped) heldCounters = parsed.skipped;
+      if (parsed.pulseSkipped) pulseHeld = parsed.pulseSkipped;
     }
     return {
       client,
@@ -1147,10 +1149,21 @@ export class Ed3App {
       seen: this.seenOf(mac),
       mac,
       heldCounters,
+      pulseHeld,
     };
   }
 
-  async succeeded({ client, targets, at, ahead, unreadTypes, seen, mac, heldCounters = [] }) {
+  async succeeded({
+    client,
+    targets,
+    at,
+    ahead,
+    unreadTypes,
+    seen,
+    mac,
+    heldCounters = [],
+    pulseHeld = [],
+  }) {
     // A write, a read back (or an identity check) left after these reads, between two
     // requests of the round: what it may contradict is older than it: the states of the
     // ED3's relays, and the MAC (an identity check). The rest (counters, clamps, voltage,
@@ -1183,7 +1196,9 @@ export class Ed3App {
       return;
     }
     this.duplicateOf = this.config.duplicateOf;
-    if (mac && !overtaken) this.peers?.macSeen(this.slot, mac);
+    // Overtaken too: the MAC is the owner's (mayApplyOvertaken), and a later slot reading the
+    // same ED3 must find it (One ED3, one slot).
+    if (mac) this.peers?.macSeen(this.slot, mac);
     this.firstRoundDone();
     this.pause = undefined;
     this.failures = 0;
@@ -1206,7 +1221,7 @@ export class Ed3App {
       }
       this.model.set(code, { ...target, at });
     }
-    this.round = { unreadTypes, heldCounters };
+    this.round = { unreadTypes, heldCounters, pulseHeld };
     // Which ED3 answered, against the owner of the devices, before anything is published
     // (overtaken: checked by mayApplyOvertaken, the owner left as it is).
     if (!overtaken) {
@@ -1223,7 +1238,6 @@ export class Ed3App {
     await this.flush();
   }
 
-  /** The round failed: a pause; a refused key stops the reads; `other`: another GCE box answers. */
   /**
    * May a round overtaken by a request (m-18) be applied, its relays aside? Only when it read
    * the owner of the devices, already judged the same, with nothing else in doubt: the MAC
@@ -1241,6 +1255,7 @@ export class Ed3App {
     return seen === undefined && owner.id === this.config.key;
   }
 
+  /** The round failed: a pause; a refused key stops the reads; `other`: another GCE box answers. */
   async failed(err, mono, other) {
     this.firstRoundDone();
     if (other) {
@@ -1356,6 +1371,9 @@ export class Ed3App {
     if (this.round?.heldCounters?.length > 0) {
       // Without the clamp links in the expected form, which counters a clamp feeds is not known.
       parts.push(T.counterSourceUnknown(listOf(this.round.heldCounters.map((n) => `C${n}`))));
+    }
+    if (this.round?.pulseHeld?.length > 0) {
+      parts.push(T.pulseCounters(listOf(this.round.pulseHeld.map((n) => `C${n}`))));
     }
     const faults = [...this.model.values()].filter((t) => t.fault === true);
     if (faults.length > 0) {

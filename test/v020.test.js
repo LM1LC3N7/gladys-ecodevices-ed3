@@ -77,20 +77,29 @@ test('m-18: an overtaken round keeps the newer relay state and applies the clamp
   // The next round reads a new clamp power; its counters answer slowly; once it has read R1
   // (off), R1 is switched on at the ED3 itself and a read back leaves meanwhile.
   world.power[0] = 777_000;
+  world.x8r[0].state[1] = true;
   world.latency = (r) => (r.path.includes('core_logger?option=filter_state') ? 3 * SECOND : 20);
   const n = rounds(world).length;
   for (let i = 0; i < 2000 && rounds(world).length === n; i += 1) await wait(10);
   await wait(100);
   world.relays[0] = true;
   const back = app.readBack(PRIORITY.CONFIRM, clock.monotonic() + 10 * SECOND, { resend: true });
+  const r1States = () =>
+    gladys.fake.states.filter((s) => s.device_feature_external_id === F('relay', 'r1', 'switch'))
+      .length;
   await wait(5 * SECOND);
   assert.equal((await back).values.get('r1'), 1);
   await app.flush();
+  // R1: its first read (0), then the read back (1); the overtaken round, which ended after the
+  // read back (it waited behind the slow counters), publishes its kept R1 not again.
+  assert.equal(r1States(), 2, 'R1 not published again by the overtaken round');
   assert.equal(gladys.fake.lastState(F('relay', 'r1', 'switch')), 1, 'the read back stands');
   assert.equal(app.model.get('r1').value, 1);
   // The power that overtaken round read is applied (it was dropped with the round before).
   assert.equal(app.model.get('t1').value, 777);
   assert.equal(gladys.fake.lastState(F('clamp', 't1', 'power')), 777);
+  // An X-8R output is not one of the ED3's relays: the round's state applies.
+  assert.equal(app.model.get('x8r4259840-2').value, 1);
 });
 
 test('m-18: an overtaken round that read another MAC is not applied at all', async (t) => {

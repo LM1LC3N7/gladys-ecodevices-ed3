@@ -11,8 +11,10 @@ the X-8R outputs (read only) and the X-THL sensors.
   you accept it ("Accept the held index", two clicks; an accepted jump is
   counted in full by Gladys). Counters fed by a current clamp or a pulse
   input are named after it ("T1-EDF · Consumption (C11)").
-- Clamps: the power in W, signed (negative in the direction of production
-  or injection).
+- Clamps: the power in W, signed: positive in the direction of the clamp's
+  `ID_Logger_tore` counter, negative in that of its `ID_Logger_tore_neg`
+  one; whether that is consumption or production is set on the ED3 (the
+  counter's name says it).
 - One Eco-Devices 3 per slot: the same box in two slots is refused (its
   energy would be counted twice).
 - Relays: read only unless listed in "Relays Gladys may drive"; switching a

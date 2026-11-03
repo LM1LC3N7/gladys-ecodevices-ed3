@@ -10,13 +10,12 @@ the notes of the version's GitHub Release.
 
 ## [Unreleased]
 
-Next release: minor (0.2.0).
-
 ### Added
 
 - The counters fed by a current clamp are offered, in kWh: their index is in
-  Wh as the others (GCE's documentation, and checked on a real Eco-Devices 3:
-  the counter of one of its clamps grew at its own average power in Wh).
+  Wh as the teleinfo's (GCE's documentation, and checked on a real
+  Eco-Devices 3: the counter of its battery clamp grew at the power the
+  clamp measured, in Wh).
   Each counter fed by a clamp or a pulse input is named after it in Discover,
   as the ED3 lists them (`ID_Logger_tore`, `ID_Logger_tore_neg`,
   `ID_Logger_pulse`): "T1-EDF · Consumption (C11)", "T1-EDF (negative) ·
@@ -26,8 +25,12 @@ Next release: minor (0.2.0).
 ### Changed
 
 - The clamp power (W) is checked on a real ED3 (current × voltage × power
-  factor); its sign is documented: negative in the direction of production
-  or injection.
+  factor); its sign is documented: positive in the direction of the clamp's
+  `ID_Logger_tore` counter, negative in that of its `ID_Logger_tore_neg`
+  one (consumption or production: the counter says it).
+- An electricity counter fed by a pulse input is no longer offered (its
+  unit is not checked; the status names it); a clamp linked to a counter
+  outside 11 to 24 counts as a list of another form.
 - A list of clamp links in another form than a real ED3 gives (another
   length, counter numbers instead of ids: another firmware) is never
   guessed: the counters 11 to 24 are then held, as before, and the status
@@ -38,6 +41,13 @@ Next release: minor (0.2.0).
   round was dropped (under frequent commands, one round in three applied).
 - The water unit (mL) is confirmed against a real water meter. The docs say
   what was checked on a real ED3 and with what.
+
+### Fixed
+
+- The docs of 0.1.2 said the counters of a clamp were not offered; on a
+  firmware that lists `ID_Logger_tore_neg`, 0.1.2 did offer those of the
+  negative direction (only `ID_Logger_tore` was read), in kWh, with the
+  same values as now: nothing to redo for them.
 
 ## [0.1.2] - 2026-11-01
 

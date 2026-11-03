@@ -130,7 +130,7 @@ test('I-5 (r3-stale): a switch-off of slot 2 right after its round is never undo
   second.hub.stop();
 });
 
-test('I-5: a round during which a read back left is not applied (its reads are older)', async () => {
+test('I-5: a round during which a read back left never applies its older relay state', async () => {
   const device = created('relay', 'r1', { relayKind: 'switch' });
   const world = fakeEd3();
   const { app, gladys, start, wait, clock } = await setup({ config: R1, devices: [device], world });

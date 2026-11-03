@@ -103,7 +103,9 @@ test/fixtures/cce66-ed3.js, his masked MAC replaced by an invented one):
    `…/api/ebx/x8r/0/SetOnR/1?ApiKey=…` allume-t-elle la sortie 1 (0 = la
    place dans la liste), ou faut-il `…/api/ebx/x8r/4259840/SetOnR/1` (le
    `_id`) ? Et ce que répond l’ED3 à cet appel.
-4. Les noms dans la Découverte (« T1-EDF · Consommation (C11) »,
+4. « Tri » (entrée impulsions 3, reliée au compteur 28, de la catégorie gaz,
+   `ConsoPulse` 1 000 000) : c’est quel compteur (gaz, électricité, autre) ?
+5. Les noms dans la Découverte (« T1-EDF · Consommation (C11) »,
    « T1-EDF (négatif) · Injection (C19) ») : clairs pour vous ?
 
 ## Decisions
@@ -179,19 +181,23 @@ output-index` (never an energy-sensor index: it would be counted as
 Next release: **minor** (0.2.0, new features), from Actions > Release.
 
 - **Clamp counters offered, in Wh** (published in kWh). Why Wh is
-  justified: GCE (Postman, "Objet Core Logger") says the Core Logger index
-  is "en wH" for every electricity counter, whatever its source ("la trame
-  de téléinformation ... ainsi que les 8 entrées Tore"); and his values
-  agree: between post 7 (core_logger) and post 9 (`objDescriptor`, whose
-  `indexPost`/`indexTotal` repeat his counter indexes), C23 (T7 negative)
-  went 274 442 -> 278 471 (+4 029) while C0 (teleinfo, Wh confirmed) went
-  132 533 861 -> 132 584 173 (+50 312): a ratio 0.080, against 57 W / 811 W
-  = 0.070 for their 5-minute averages (`moyenne`, W per GCE) in post 7; in
-  mWh the ratio would be 1000 times smaller. Over the ~71 h between the
-  posts, +4 029 Wh is 57 W, his `moyenne` exactly. C20 (T6-Solaire) +9 508
-  (134 W on average, a solar input in November), C22 unchanged at 19 610.
-  Not compared with the ED3's own page (question 6 unanswered): not needed
-  given the two above.
+  justified (rewritten after review r1, minor 1): GCE (Postman, "Objet Core
+  Logger") gives the Core Logger index "en wH" for the teleinfo and the
+  clamps; and on his ED3 the decisive check is against the clamp power,
+  itself checked by physics (mW = mA x V x %): C23 (T7 negative) went
+  274 442 (post 7, 2026-10-31 00:43) -> 278 471 (post 9 `objDescriptor`,
+  `indexTotal4`/`indexPost3`, matched by value; ~2026-11-02 23:46, 71.05 h):
+  +4 029 = 56.7 W on average in Wh, while T7 read ~60 W at both readings
+  (`moyenne` 57 W in post 7; `puissance` -63.8 W and `instTotal4` 59 W in
+  post 9), and C22 (T7 positive) stayed at 19 610. In mWh: 0.057 W, out.
+  Orders of magnitude agree too (C11 3 294 kWh, C13 1 476 kWh). Caveat: the
+  `objDescriptor` was read at `.161`, the rest at `.162` (question 1); its
+  indexes continue his counters (C0, C20, C22, C23, water), so the same ED3.
+- **Input guard** (review r1, minor 2): a clamp linked to a counter outside
+  11-24 makes the list "another form" (held as above); an electricity
+  counter (0-24) fed by a pulse input is held (`pulseSkipped`, status
+  "fed by a pulse input"), Wh being checked for the teleinfo and the clamps
+  only; water and gas fed by a pulse stay published (mL checked).
 - **Links**: `ID_Logger_tore[i]` / `ID_Logger_tore_neg[i]` = the counter
   `_id` of clamp i+1's positive / negative direction, `ID_Logger_pulse[i]`
   of pulse input i+1 (0 = none). Each counter fed so is named after its
@@ -231,6 +237,19 @@ Next release: **minor** (0.2.0, new features), from Actions > Release.
   flight (a cut round is not applied: unchanged). Tests in test/v020.test.js
   (read backs every 2 s: every round applied; the relay kept; another MAC:
   nothing applied), mutants killed.
+- **Review r1 (987203a): I-1** an overtaken round applied did not tell the
+  hub its MAC (`macSeen`): a later slot reading the same ED3 then bound and
+  published it (kWh counted twice). The MAC is now told in that case too
+  (it is the owner's, checked by mayApplyOvertaken). **I-2**: the duplicate
+  check of mayApplyOvertaken is tested. Both by the reviewer's scenarios s1
+  to s3 (test/v020-dup.test.js; I-1 reverted and A06 fail them). **I-3**:
+  the sign is described as the code does it (positive towards the
+  `ID_Logger_tore` counter, negative towards the `_neg` one, the category
+  by the counter's number), not "negative = production". **A13** killed (an
+  X-8R value of an overtaken round is applied); **A14** equivalent: the
+  kept relay stamped with the round's time is pushed again with the same
+  value, which the publisher drops (unchanged), and the checks it runs see
+  a value newer than any command.
 - **m-19**: water mL confirmed (meter). **m-20**: the docs say what is
   confirmed by what (the clamp power by a real ED3 now), and that the MAC in
   the tests is invented. **m-21**: `app.stop()` in `t.after` in

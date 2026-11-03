@@ -83,13 +83,19 @@ L’ED3 peut lister moins de 30 compteurs (un vrai en listait 26) : un
 compteur est reconnu par son identifiant ED3, jamais par sa place dans la
 liste, et un compteur absent de la liste n’est pas proposé.
 
-Unités : tous les index d’électricité sont en Wh sur l’ED3, publiés en
-kWh. Vérifié sur un vrai : son compteur 0 (téléinfo) recoupait, à quelques
-minutes près, le même Linky lu par un Eco-Devices RT2 ; le compteur d’un de
-ses tores a pris 4 029 pendant que sa téléinfo prenait 50 312 Wh, à 57 W
-contre 811 W en moyenne (des Wh, pas des mWh). L’eau et le gaz en mL,
-publiés en m³ : comparé à un vrai compteur d’eau (61 503,0 L au compteur,
-61 503 000 sur l’ED3).
+Unités : les index de la téléinfo et des tores sont en Wh sur l’ED3,
+publiés en kWh. Vérifié sur un vrai : son compteur 0 (téléinfo) recoupait,
+à quelques minutes près, le même Linky lu par un Eco-Devices RT2 ; le
+compteur de son tore de batterie a pris 56,7 W de moyenne sur 71 heures en
+Wh, pendant que le tore mesurait environ 60 W aux deux relevés (57 W de
+moyenne au premier ; 64 W d’après sa puissance et 59 W dans les données de
+la page de l’ED3 au second) : en mWh, ce serait 0,06 W. Ce second relevé
+venait de l’adresse .161, les autres de .162 (le même ED3 d’après ses
+index ; question posée). L’eau et le gaz en mL, publiés en m³ : comparé à un vrai
+compteur d’eau (61 503,0 L au compteur, 61 503 000 sur l’ED3). Un compteur
+d’électricité alimenté par une entrée impulsions n’est pas proposé (son
+unité n’est pas vérifiée ; l’état le nomme), ni rien quand un tore est
+relié à un compteur hors de 11 à 24.
 
 (¹) Les compteurs qu’un tore peut alimenter (11 à 24) ne sont proposés que
 si l’ED3 liste les liens de ses tores sous la forme que donne un vrai
@@ -105,11 +111,14 @@ deviné d’une liste d’une autre forme.
 (²) La puissance d’un tore est le `puissance` de l’ED3 (mW, publiée en W, une
 décimale) : sur un vrai ED3, elle vaut courant × tension × facteur de
 puissance pour chaque tore (1 455 467 mW pour 6,58 A × 235,5 V × 0,94). Son
-signe est gardé : positive quand le tore alimente son compteur
-(`ID_Logger_tore`, consommation), négative dans l’autre sens
-(`ID_Logger_tore_neg` : production, injection, batterie qui se décharge).
-Un tore relié dans un seul sens montre quand même l’autre sens en
-puissance négative.
+signe est gardé : positive dans le sens du compteur `ID_Logger_tore` du
+tore, négative dans le sens de son compteur `ID_Logger_tore_neg`. Lequel
+est consommation ou production dépend du réglage du tore sur l’ED3 : le
+numéro et le nom du compteur le disent (sur un vrai ED3, un tore solaire
+produit dans le sens positif, vers son compteur de production C20, et trois
+autres tores ont leur sens négatif vers des compteurs de consommation). Un
+tore relié dans un seul sens montre quand même l’autre sens, en une
+puissance qu’aucun compteur ne compte.
 
 L’ED3 est lu toutes les 15 secondes par défaut (10 s au moins). Une valeur
 que l’ED3 ne donne pas (absente, un texte, hors plage, une tension de 0 V)

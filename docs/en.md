@@ -77,13 +77,18 @@ lists) neither. The ED3 may list fewer than 30
 counters (a real one listed 26): a counter is known by its ED3 id, never
 by its place in the list, and one not listed is not offered.
 
-Units: every electricity index is in Wh on the ED3, published in kWh.
-Checked on a real one: its counter 0 (teleinfo) matched, within a few
-minutes, the same Linky read by an Eco-Devices RT2; the counter of one of
-its clamps grew 4,029 while its teleinfo grew 50,312 Wh, at 57 W against
-811 W on average (Wh, not mWh). Water and gas in mL, published in m³:
-compared with a real water meter (61,503.0 L on the meter, 61,503,000 on
-the ED3).
+Units: the teleinfo and clamp indexes are in Wh on the ED3, published in
+kWh. Checked on a real one: its counter 0 (teleinfo) matched, within a few
+minutes, the same Linky read by an Eco-Devices RT2; the counter of its
+battery clamp grew at 56.7 W on average over 71 hours in Wh, while the
+clamp read about 60 W at both readings (57 W on average at the first; 64 W
+from its power and 59 W in the ED3's page data at the second): in mWh it
+would be 0.06 W. That second reading came from address .161, the others
+from .162 (the same ED3 by its indexes; asked). Water and gas in mL,
+published in m³: compared with a real water meter (61,503.0 L on the
+meter, 61,503,000 on the ED3). An electricity counter fed by a pulse input
+is not offered (its unit is not checked; the status names it), nor is
+anything when a clamp is linked to a counter outside 11 to 24.
 
 The ED3 is read every 15 seconds by default (10 s at least). A value the
 ED3 does not give (absent, a text, out of range, a voltage of 0 V) is not
@@ -105,10 +110,14 @@ from a list of another form.
 (²) The clamp power is the ED3's `puissance` (mW, published in W, one
 decimal): on a real ED3 it equals current × voltage × power factor for each
 clamp (1,455,467 mW for 6.58 A × 235.5 V × 0.94). Its sign is kept: positive
-while the clamp feeds its counter (`ID_Logger_tore`, consumption), negative
-in the other direction (`ID_Logger_tore_neg`: production, injection, a
-battery discharging). A clamp listed for one direction only still shows
-the other one as a negative power.
+in the direction of the clamp's `ID_Logger_tore` counter, negative in that
+of its `ID_Logger_tore_neg` counter. Which direction is consumption or
+production depends on how the clamp is set up on the ED3: the counter's
+number and name say it (on a real ED3, a solar clamp produces in the
+positive direction, towards its production counter C20, and three other
+clamps have their negative direction towards consumption counters). A
+clamp listed for one direction only still shows the other one, as a power
+counted by no counter.
 
 ## Counters: lifetime indexes, never 0, a drop or a jump held
 

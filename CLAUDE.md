@@ -71,8 +71,11 @@ index, dated on the session clock.
   slot is not used (src/hub.js, `duplicateOf`); a later slot waits for the
   earlier ones once per start, before its first reads, never between a read
   and its use (`waitEarlierSlots`).
-- **Nothing older than a command applied**: a round during which a write or
-  a read back left is dropped (`client.sentAhead`).
+- **Nothing older than a command applied**: a round during which a write, a
+  read back or an identity check left (`client.sentAhead`) is applied but
+  for R1 / R2 (they keep the newer value) only when it read the owner
+  (`mayApplyOvertaken`, the MAC still told to the hub); otherwise dropped.
+  A write cuts the polling read in flight (that round is not applied).
 - **The container rootfs is read-only.** Write only under `/data`; every
   load and save is bounded (`TIMINGS.storeWait`): never await /data for good.
 - **Versions belong to the Release workflow**; `test/manifest.test.js` checks

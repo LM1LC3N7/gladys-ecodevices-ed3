@@ -291,3 +291,62 @@ test('cce66 end to end with his object/ed3: clamp counters offered by name, publ
   assert.match(nameOf('t2'), /^T2-Maison \(T2\)$/);
   assert.equal(store.data.indexes.c11.last.value, 3293.592);
 });
+
+test('input guard: a clamp linked out of 11-24 is another form; a pulse feeding electricity is held', () => {
+  for (const [what, change] of Object.entries({
+    'clamp to water (C25)': { ID_Logger_tore: [851993, 0, 0, 0, 0, 0, 0, 0] },
+    'clamp to gas (C29)': { ID_Logger_tore_neg: [851997, 0, 0, 0, 0, 0, 0, 0] },
+    'clamp to the teleinfo (C0)': { ID_Logger_tore: [851968, 0, 0, 0, 0, 0, 0, 0] },
+    'clamp to a tariff (C10)': { ID_Logger_tore_neg: [851978, 0, 0, 0, 0, 0, 0, 0] },
+  })) {
+    const ed3 = parseEd3({ ...OBJECT_ED3, ...change });
+    assert.equal(ed3.linksRead, false, what);
+    assert.deepEqual(
+      [...ed3.held],
+      [...Array(14)].map((_, i) => 11 + i),
+      what,
+    );
+  }
+  // Clamps at the bounds: 11 and 24 are fine.
+  const bounds = parseEd3({
+    ...OBJECT_ED3,
+    ID_Logger_tore: [851979, 0, 0, 0, 0, 0, 0, 851992],
+    ID_Logger_tore_neg: [0, 0, 0, 0, 0, 0, 0, 0],
+  });
+  assert.equal(bounds.linksRead, true);
+  // A pulse input feeding C11 (Wh not checked for a pulse) and C26 (water): C11 held, said.
+  const ed3 = parseEd3({
+    ...OBJECT_ED3,
+    ID_Logger_tore: [0, 0, 0, 0, 0, 0, 0, 0],
+    ID_Logger_tore_neg: [0, 0, 0, 0, 0, 0, 0, 0],
+    ID_Logger_pulse: [851979, 851994, 0, 0],
+  });
+  assert.equal(ed3.linksRead, true);
+  const { targets, skipped, pulseSkipped } = parseCounters(
+    CORE_LOGGER,
+    undefined,
+    ed3.held,
+    ed3.sources,
+  );
+  assert.deepEqual(skipped, []);
+  assert.deepEqual(pulseSkipped, [11]);
+  assert.equal(targets.has('c11'), false);
+  assert.equal(targets.get('c12').value, 1064.294, 'not fed by a pulse: published');
+  assert.equal(targets.get('c26').source.name, 'Pulse 2');
+});
+
+test('input guard end to end: a pulse feeding C11 is named in the status, never offered', async (t) => {
+  const world = realEd3();
+  world.answers.set('object/ed3/0', {
+    ...OBJECT_ED3,
+    ID_Logger_tore: [0, 0, 0, 851982, 0, 0, 0, 0],
+    ID_Logger_pulse: [851979, 0, 0, 0],
+  });
+  const { app, gladys, start } = await setup({ world, store: boundStore() });
+  t.after(() => app.stop());
+  await start();
+  assert.match(message(gladys), /C11 \(fed by a pulse input\) not offered/);
+  assert.match(message(gladys, 'fr'), /C11 \(alimentés par une entrée impulsions\) non proposés/);
+  assert.ok(!discovered(gladys).includes('ext:ed3:counter:c11'));
+  assert.ok(discovered(gladys).includes('ext:ed3:counter:c12'));
+});
