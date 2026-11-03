@@ -15,14 +15,18 @@ the notes of the version's GitHub Release.
 - The docs no longer say "Never tested with a real device": the readings are
   checked against a real Eco-Devices 3 (a forum member's, firmware 1.3.0,
   its recorded answers replayed in the tests); the relay commands are not
-  tested on a real device yet, and no X-8R nor X-THL was seen on a real one.
+  tested on a real device yet, and no X-8R, X-THL, gas nor tariff index was
+  seen on a real one (README and integration description too).
 
 ### Fixed
 
 - An electricity counter that a pulse input may feed is held back (its unit
   is not checked) in two more cases: listed both by a clamp and by a pulse
   input, and when the Eco-Devices 3 lists its pulse links in another form
-  (then every electricity counter no clamp feeds; the status names them).
+  (then every electricity counter no clamp feeds, the teleinfo C0 to C10
+  included: not offered, and no longer updated while it lasts when already
+  created; the status names them). Without that list (absent: an older
+  firmware), nothing more is held, as before.
 - Docs: a clamp linked outside the counters 11 to 24 holds back those
   counters only, not everything.
 

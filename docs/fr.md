@@ -95,13 +95,18 @@ moyenne au premier ; 64 W d’après sa puissance et 59 W dans les données de
 la page de l’ED3 au second) : en mWh, ce serait 0,06 W. Ce second relevé
 venait de l’adresse .161, les autres de .162 (le même ED3 d’après ses
 index ; question posée). L’eau et le gaz en mL, publiés en m³ : comparé à un vrai
-compteur d’eau (61 503,0 L au compteur, 61 503 000 sur l’ED3). Un compteur
-d’électricité alimenté par une entrée impulsions n’est pas proposé (son
-unité n’est pas vérifiée ; l’état le nomme), ni un compteur relié à la fois
-à un tore et à une entrée impulsions. Quand l’ED3 liste les compteurs
-alimentés par ses entrées impulsions sous une autre forme (autre firmware),
-aucun compteur d’électricité qu’un tore n’alimente pas de façon connue
-n’est proposé (l’état les nomme). Les compteurs 11 à 24 ne sont pas proposés
+compteur d’eau (61 503,0 L au compteur, 61 503 000 sur l’ED3). Quand l’ED3
+donne `ID_Logger_pulse` (les compteurs alimentés par ses entrées
+impulsions), un compteur d’électricité alimenté par une entrée impulsions
+n’est pas proposé (son unité n’est pas vérifiée ; l’état le nomme), ni un
+compteur relié à la fois à un tore et à une entrée impulsions. Sans cette
+liste (absente : firmware plus ancien), on ne sait pas quels compteurs les
+entrées impulsions alimentent, et un tel compteur est publié en kWh comme
+les autres, son unité non vérifiée. Quand l’ED3 donne cette liste sous une
+autre forme (autre firmware), aucun compteur d’électricité qu’un tore
+n’alimente pas de façon connue n’est proposé, téléinfo (C0 à C10) comprise,
+et un compteur déjà créé dans Gladys n’est plus mis à jour tant que cela
+dure (l’état les nomme). Les compteurs 11 à 24 ne sont pas proposés
 quand un tore est relié à un compteur hors de 11 à 24 (voir (¹)).
 
 (¹) Les compteurs qu’un tore peut alimenter (11 à 24) ne sont proposés que

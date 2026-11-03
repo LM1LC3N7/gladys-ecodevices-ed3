@@ -388,3 +388,12 @@ set by hand).
       with a value older than that switch-off. Worst case one more resend of
       the switch-off (protective, bounded by `resendMax`). The 0.2.0 note
       ("newer than any command") now says so.
+- [x] **Review r1 of 0.2.1** (5effdaf, approved, 4 minors, no logic change
+      in src/): m1, the CHANGELOG, docs and status `pulseLinksUnread` say a
+      counter already created is no longer updated, the teleinfo (C0-C10)
+      included; m2, the README and manifest banner as narrow as the docs
+      (answers recorded and replayed; X-8R, X-THL, gas, tariff indexes not
+      seen; commands not tested); m3, the docs say the case
+      `ID_Logger_pulse` absent (published as before, unit not checked); m4,
+      the reviewer's s2 test (a C0 created, frozen then resumed) in
+      test/cce66.test.js.

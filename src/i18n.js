@@ -299,8 +299,8 @@ export const T = {
   // `ID_Logger_pulse` in another form: any electricity counter no clamp feeds may be fed by a pulse.
   pulseLinksUnread: (list) =>
     both(
-      `${list.en} not offered: this ED3 does not list the counters its pulse inputs feed in the expected form (another firmware?), and the unit of an electricity counter fed by a pulse input is not checked.`,
-      `${list.fr} non proposés : cet ED3 ne liste pas les compteurs alimentés par ses entrées impulsions sous la forme attendue (autre firmware ?), et l’unité d’un compteur d’électricité alimenté par une entrée impulsions n’est pas vérifiée.`,
+      `${list.en} not offered, nor updated when already created: this ED3 does not list the counters its pulse inputs feed in the expected form (another firmware?), and the unit of an electricity counter fed by a pulse input is not checked.`,
+      `${list.fr} non proposés, ni mis à jour s’ils sont déjà créés : cet ED3 ne liste pas les compteurs alimentés par ses entrées impulsions sous la forme attendue (autre firmware ?), et l’unité d’un compteur d’électricité alimenté par une entrée impulsions n’est pas vérifiée.`,
     ),
   indexHeld: (list) =>
     both(

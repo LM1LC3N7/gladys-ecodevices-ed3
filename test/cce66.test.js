@@ -14,7 +14,7 @@ import { counterKind } from '../src/constants.js';
 import { parseCounters, parseEd3, parseMac } from '../src/ed3/model.js';
 import { memoryStore } from '../src/store.js';
 import { fakeEd3 } from './helpers/fakeEd3.js';
-import { CONFIG, F, MINUTE, SALT, boundMemory, created, setup } from './helpers/app.js';
+import { CONFIG, F, MINUTE, SALT, START, boundMemory, created, setup } from './helpers/app.js';
 import {
   CORE_LOGGER,
   HELD,
@@ -446,15 +446,17 @@ test('pulse list of another form end to end: C0 named in the status, never offer
   const { app, gladys, start } = await setup({ world, store: boundStore() });
   t.after(() => app.stop());
   await start();
-  assert.match(message(gladys), /C0 not offered: this ED3 does not list the counters its pulse/);
+  assert.match(
+    message(gladys),
+    /C0 not offered, nor updated when already created: this ED3 does not list the counters its pulse/,
+  );
   assert.match(
     message(gladys, 'fr'),
-    /C0 non proposés : cet ED3 ne liste pas les compteurs alimentés par ses entrées impulsions/,
+    /C0 non proposés, ni mis à jour s’ils sont déjà créés : cet ED3 ne liste pas les compteurs alimentés par ses entrées impulsions/,
   );
   assert.ok(!discovered(gladys).includes('ext:ed3:counter:c0'));
   assert.ok(discovered(gladys).includes('ext:ed3:counter:c11'));
   assert.ok(discovered(gladys).includes('ext:ed3:counter:c25'));
-  assert.equal(last(gladys, 'c0'), undefined);
 });
 
 test('a counter listed by a clamp and a pulse input end to end: held, named in the status', async (t) => {
@@ -466,4 +468,44 @@ test('a counter listed by a clamp and a pulse input end to end: held, named in t
   assert.match(message(gladys), /C11 \(fed by a pulse input\) not offered/);
   assert.ok(!discovered(gladys).includes('ext:ed3:counter:c11'));
   assert.ok(discovered(gladys).includes('ext:ed3:counter:c0'));
+});
+
+// Review 0.2.1 r1 (s2, mineur 4): a C0 created under 0.2.0, the pulse list in another form for
+// 5 minutes, then the expected form again: nothing for C0 while held, then its index resumes.
+test('a C0 already created is no longer updated while the pulse list has another form, then resumes', async (t) => {
+  const world = fakeEd3({ mac: REAL_MAC });
+  world.loggers = null;
+  world.answers.set('system/info', SYSTEM_INFO);
+  let c0 = 132533861;
+  const core = () => CORE_LOGGER.map((e) => (e._id === 851968 ? { ...e, index: c0 } : e));
+  world.answers.set('object/core_logger?option=filter_state', core());
+  world.answers.set('object/ed3/0', OBJECT_ED3);
+  const store = memoryStore();
+  store.data = boundMemory(CONFIG, REAL_MAC_NORMALIZED);
+  const device = created('counter', 'c0', { last: { value: 132533.861, at: START - MINUTE } });
+  const { app, gladys, start, wait } = await setup({ world, store, devices: [device] });
+  t.after(() => app.stop());
+  const C0 = F('counter', 'c0', 'index');
+  const states = () => gladys.fake.states.filter((s) => s.device_feature_external_id === C0);
+  await start();
+  await wait(2 * MINUTE);
+  const before = states().length;
+  assert.ok(before >= 1, 'well formed: C0 published');
+  // Another form for 5 min; C0 keeps counting (+1 kWh a minute, 60 kW: within the guard).
+  world.answers.set('object/ed3/0', { ...OBJECT_ED3, ID_Logger_pulse: [25, 26, 28, 29] });
+  for (let i = 0; i < 5; i += 1) {
+    c0 += 1000;
+    world.answers.set('object/core_logger?option=filter_state', core());
+    await wait(MINUTE);
+  }
+  assert.equal(states().length - before, 0, 'nothing for C0 while held');
+  assert.match(message(gladys), /C0 not offered, nor updated when already created/);
+  assert.match(message(gladys, 'fr'), /C0 non proposés, ni mis à jour s’ils sont déjà créés/);
+  // Back to the expected form: the index resumes, accepted by the guard.
+  world.answers.set('object/ed3/0', OBJECT_ED3);
+  c0 += 1000;
+  world.answers.set('object/core_logger?option=filter_state', core());
+  await wait(2 * MINUTE);
+  assert.equal(gladys.fake.lastState(C0), (132533861 + 6000) / 1000);
+  assert.doesNotMatch(message(gladys), /pulse inputs feed/);
 });

@@ -88,12 +88,16 @@ from its power and 59 W in the ED3's page data at the second): in mWh it
 would be 0.06 W. That second reading came from address .161, the others
 from .162 (the same ED3 by its indexes; asked). Water and gas in mL,
 published in m³: compared with a real water meter (61,503.0 L on the
-meter, 61,503,000 on the ED3). An electricity counter fed by a pulse input
-is not offered (its unit is not checked; the status names it), nor one
-listed both by a clamp and by a pulse input. When the ED3 lists the counters
-its pulse inputs feed in another form (another firmware), no electricity
-counter that a clamp is not known to feed is offered (the status names
-them). The counters 11 to 24 are not offered when a clamp is linked to a
+meter, 61,503,000 on the ED3). When the ED3 gives `ID_Logger_pulse` (the
+counters its pulse inputs feed), an electricity counter fed by a pulse
+input is not offered (its unit is not checked; the status names it), nor
+one listed both by a clamp and by a pulse input. Without that list (absent:
+an older firmware), which counters the pulse inputs feed is not known, and
+such a counter is published in kWh as any other, its unit not checked.
+When the ED3 gives that list in another form (another firmware), no
+electricity counter that a clamp is not known to feed is offered, the
+teleinfo (C0 to C10) included, and one already created in Gladys is no
+longer updated while it lasts (the status names them). The counters 11 to 24 are not offered when a clamp is linked to a
 counter outside 11 to 24 (see (¹)).
 
 The ED3 is read every 15 seconds by default (10 s at least). A value the

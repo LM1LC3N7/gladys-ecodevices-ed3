@@ -129,7 +129,7 @@ test('the configuration matches the code; the key a secret without default', () 
     assert.ok(intro.description[lang].length <= 1000, `intro.${lang} over 1000 characters`);
     assert.match(
       intro.description[lang],
-      /commands not tested on a real device|commandes non testées sur un vrai appareil/,
+      /Answers recorded on a real Eco-Devices 3 \(firmware 1\.3\.0\) and replayed in the tests.*X-8R, X-THL, gas and tariff indexes not seen.*commands not tested on a real device|Réponses relevées sur un vrai Eco-Devices 3 \(firmware 1\.3\.0\) et rejouées dans les tests.*X-8R, X-THL, gaz et index tarifaires non vus.*commandes non testées sur un vrai appareil/,
     );
   }
 });
