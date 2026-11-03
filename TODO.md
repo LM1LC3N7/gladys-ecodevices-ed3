@@ -348,3 +348,14 @@ Next release: **minor** (0.2.0, new features), from Actions > Release.
 - **m-8**: the counters fed by a clamp (listed in `ID_Logger_tore`; without
   the list, 11 to 24) are not offered until their unit is confirmed
   (question 2); the clamp power (mW, two sources) is kept.
+
+## Next patch (review cce66-n9 r2, 6b55531)
+
+- m1: docs/en.md:90-91 and docs/fr.md:97-98 say "nor is anything" / « ni rien » offered when a
+  clamp is linked outside 11-24; only counters 11-24 are held back (C0, water, powers stay offered).
+- m2: holding back pulse-fed electricity counters needs a readable, unambiguous list. Two cases
+  still publish C11 in kWh with no checked unit: `ID_Logger_pulse` in another shape, and a counter
+  linked both by a clamp and a pulse input (ambiguous source cleared, `src/ed3/model.js:138`). Hold
+  back in both cases (or document the limit); update the stale line at TODO.md:216.
+- Note on A14: after an Off resent from /data without a read-back, R1's kept value can be older than
+  that resend; worst case one more resend, bounded by `resendMax`. Code is right.
