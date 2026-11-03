@@ -224,7 +224,8 @@ test('format guard: GCE example (no negative list), pulse list of another form, 
   assert.equal(gce.sources.get(11).name, 'T1-EDF');
   assert.equal(gce.sources.has(19), false);
   assert.ok(gce.targets.has('t8') && !gce.targets.has('t2'), 'T2 feeds no counter there');
-  // A pulse list of another form: no pulse names, nothing held.
+  // A pulse list of another form: no pulse names, the clamp counters not held (see the
+  // 0.2.1 tests below for the electricity counters no clamp feeds).
   const pulse = parseEd3({ ...OBJECT_ED3, ID_Logger_pulse: [25, 26, 28, 29] });
   assert.equal(pulse.linksRead, true);
   assert.equal(pulse.held.size, 0);
@@ -349,4 +350,120 @@ test('input guard end to end: a pulse feeding C11 is named in the status, never 
   assert.match(message(gladys, 'fr'), /C11 \(alimentés par une entrée impulsions\) non proposés/);
   assert.ok(!discovered(gladys).includes('ext:ed3:counter:c11'));
   assert.ok(discovered(gladys).includes('ext:ed3:counter:c12'));
+});
+
+// --- 0.2.1 (review cce66-n9 r2, m2): a pulse input that may feed an electricity counter -----
+
+/** The electricity counters (0-24) no clamp feeds in OBJECT_ED3. */
+const NOT_CLAMP_FED = [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 18, 21, 24];
+
+test('pulse list of another form: the electricity counters no clamp feeds are held', () => {
+  for (const [what, value] of Object.entries({
+    'counter numbers, not _id': [11, 0, 0, 0],
+    'three entries': [851993, 851994, 851996],
+    'five entries': [851993, 851994, 851996, 851997, 0],
+    'a text': ['851993', 0, 0, 0],
+    'null inside': [851993, null, 0, 0],
+    'an object': { 0: 851993 },
+    null: null,
+  })) {
+    const ed3 = parseEd3({ ...OBJECT_ED3, ID_Logger_pulse: value });
+    assert.equal(ed3.linksRead, true, what);
+    assert.deepEqual(
+      [...ed3.pulse.unread].sort((a, b) => a - b),
+      NOT_CLAMP_FED,
+      what,
+    );
+    const parsed = parseCounters(CORE_LOGGER, undefined, ed3.held, ed3.sources, ed3.pulse);
+    assert.deepEqual(parsed.skipped, [], what);
+    assert.deepEqual(parsed.pulseSkipped, [], what);
+    assert.deepEqual(parsed.pulseUnreadSkipped, [0], `${what}: C0 holds an index`);
+    assert.equal(parsed.targets.has('c0'), false, `${what}: C0 held`);
+    assert.equal(parsed.targets.get('c11').value, 3293.592, `${what}: fed by a clamp`);
+    assert.equal(parsed.targets.get('c19').value, 122.117, `${what}: fed by a clamp`);
+    assert.equal(parsed.targets.get('c25').value, 60.707, `${what}: water stays`);
+  }
+  // Absent (an older firmware, as `ID_Logger_tore_neg` in GCE's example): nothing more held.
+  const { ID_Logger_pulse: _drop, ...older } = OBJECT_ED3;
+  const absent = parseEd3(older);
+  assert.equal(absent.pulse.unread.size, 0);
+  const parsed = parseCounters(CORE_LOGGER, undefined, absent.held, absent.sources, absent.pulse);
+  assert.equal(parsed.targets.get('c0').value, 132533.861);
+  // His own list (well formed): nothing held, C0 published.
+  const real = parseEd3(OBJECT_ED3);
+  assert.equal(real.pulse.unread.size, 0);
+  assert.equal(real.pulse.fed.size, 0, 'his pulse inputs feed water and gas only');
+  const his = parseCounters(CORE_LOGGER, undefined, real.held, real.sources, real.pulse);
+  assert.deepEqual(his.pulseUnreadSkipped, []);
+  assert.equal(his.targets.get('c0').value, 132533.861);
+});
+
+test('pulse list of another form and clamp links unreadable: every electricity counter held', () => {
+  const ed3 = parseEd3({
+    ...OBJECT_ED3,
+    ID_Logger_tore: [11, 0, 0, 14, 0, 20, 22, 16],
+    ID_Logger_pulse: [25, 26, 28, 29],
+  });
+  assert.equal(ed3.linksRead, false);
+  assert.deepEqual(
+    [...ed3.pulse.unread].sort((a, b) => a - b),
+    [...Array(25)].map((_, i) => i),
+  );
+  const parsed = parseCounters(CORE_LOGGER, undefined, ed3.held, ed3.sources, ed3.pulse);
+  assert.deepEqual(parsed.skipped, HELD, 'the clamp counters said as before');
+  assert.deepEqual(parsed.pulseUnreadSkipped, [0]);
+  assert.equal(parsed.targets.has('c0'), false);
+  assert.equal(parsed.targets.get('c25').value, 60.707);
+});
+
+test('a counter listed by a clamp and by a pulse input is held; a pulse to C0 too', () => {
+  // C11 fed by T1 (positive) and by pulse input 1: ambiguous, no name, held.
+  const twice = parseEd3({ ...OBJECT_ED3, ID_Logger_pulse: [851979, 851994, 0, 0] });
+  assert.equal(twice.linksRead, true);
+  assert.equal(twice.sources.has(11), false);
+  assert.deepEqual([...twice.pulse.fed], [11], 'water (C26) is not held');
+  const parsed = parseCounters(CORE_LOGGER, undefined, twice.held, twice.sources, twice.pulse);
+  assert.deepEqual(parsed.pulseSkipped, [11]);
+  assert.equal(parsed.targets.has('c11'), false);
+  assert.equal(parsed.targets.get('c12').value, 1064.294, 'not fed by a pulse: published');
+  assert.equal(parsed.targets.get('c0').value, 132533.861);
+  // A pulse feeding C0 while the clamp links are unreadable (no source read): still held.
+  const unread = parseEd3({
+    ...OBJECT_ED3,
+    ID_Logger_tore: [11, 0, 0, 14, 0, 20, 22, 16],
+    ID_Logger_pulse: [851968, 0, 0, 0],
+  });
+  assert.equal(unread.linksRead, false);
+  assert.equal(unread.sources.size, 0);
+  const c0 = parseCounters(CORE_LOGGER, undefined, unread.held, unread.sources, unread.pulse);
+  assert.deepEqual(c0.pulseSkipped, [0]);
+  assert.equal(c0.targets.has('c0'), false);
+});
+
+test('pulse list of another form end to end: C0 named in the status, never offered', async (t) => {
+  const world = realEd3();
+  world.answers.set('object/ed3/0', { ...OBJECT_ED3, ID_Logger_pulse: [25, 26, 28, 29] });
+  const { app, gladys, start } = await setup({ world, store: boundStore() });
+  t.after(() => app.stop());
+  await start();
+  assert.match(message(gladys), /C0 not offered: this ED3 does not list the counters its pulse/);
+  assert.match(
+    message(gladys, 'fr'),
+    /C0 non proposés : cet ED3 ne liste pas les compteurs alimentés par ses entrées impulsions/,
+  );
+  assert.ok(!discovered(gladys).includes('ext:ed3:counter:c0'));
+  assert.ok(discovered(gladys).includes('ext:ed3:counter:c11'));
+  assert.ok(discovered(gladys).includes('ext:ed3:counter:c25'));
+  assert.equal(last(gladys, 'c0'), undefined);
+});
+
+test('a counter listed by a clamp and a pulse input end to end: held, named in the status', async (t) => {
+  const world = realEd3();
+  world.answers.set('object/ed3/0', { ...OBJECT_ED3, ID_Logger_pulse: [851979, 0, 0, 0] });
+  const { app, gladys, start } = await setup({ world, store: boundStore() });
+  t.after(() => app.stop());
+  await start();
+  assert.match(message(gladys), /C11 \(fed by a pulse input\) not offered/);
+  assert.ok(!discovered(gladys).includes('ext:ed3:counter:c11'));
+  assert.ok(discovered(gladys).includes('ext:ed3:counter:c0'));
 });

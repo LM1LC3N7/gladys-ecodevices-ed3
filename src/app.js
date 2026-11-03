@@ -1107,6 +1107,7 @@ export class Ed3App {
     const unreadTypes = [];
     let heldCounters = [];
     let pulseHeld = [];
+    let pulseUnreadHeld = [];
     const mono = this.monotonic();
     if (this.namesAt === undefined || mono - this.namesAt >= TIMINGS.namesInterval) {
       const names = await this.secondary(() => client.counterNames(PRIORITY.READ, hooks()));
@@ -1119,7 +1120,7 @@ export class Ed3App {
       [
         'counters',
         () => client.counters(PRIORITY.READ, hooks()),
-        (json) => parseCounters(json, this.counterNames, ed3.held, ed3.sources),
+        (json) => parseCounters(json, this.counterNames, ed3.held, ed3.sources, ed3.pulse),
       ],
       ['x8r', () => client.extensions('x8r', PRIORITY.READ, hooks()), parseX8r],
       ['xthl', () => client.extensions('xthl', PRIORITY.READ, hooks()), parseXthl],
@@ -1139,6 +1140,7 @@ export class Ed3App {
       for (const [code, target] of parsed.targets) targets.set(code, target);
       if (parsed.skipped) heldCounters = parsed.skipped;
       if (parsed.pulseSkipped) pulseHeld = parsed.pulseSkipped;
+      if (parsed.pulseUnreadSkipped) pulseUnreadHeld = parsed.pulseUnreadSkipped;
     }
     return {
       client,
@@ -1150,6 +1152,7 @@ export class Ed3App {
       mac,
       heldCounters,
       pulseHeld,
+      pulseUnreadHeld,
     };
   }
 
@@ -1163,6 +1166,7 @@ export class Ed3App {
     mac,
     heldCounters = [],
     pulseHeld = [],
+    pulseUnreadHeld = [],
   }) {
     // A write, a read back (or an identity check) left after these reads, between two
     // requests of the round: what it may contradict is older than it: the states of the
@@ -1221,7 +1225,7 @@ export class Ed3App {
       }
       this.model.set(code, { ...target, at });
     }
-    this.round = { unreadTypes, heldCounters, pulseHeld };
+    this.round = { unreadTypes, heldCounters, pulseHeld, pulseUnreadHeld };
     // Which ED3 answered, against the owner of the devices, before anything is published
     // (overtaken: checked by mayApplyOvertaken, the owner left as it is).
     if (!overtaken) {
@@ -1374,6 +1378,9 @@ export class Ed3App {
     }
     if (this.round?.pulseHeld?.length > 0) {
       parts.push(T.pulseCounters(listOf(this.round.pulseHeld.map((n) => `C${n}`))));
+    }
+    if (this.round?.pulseUnreadHeld?.length > 0) {
+      parts.push(T.pulseLinksUnread(listOf(this.round.pulseUnreadHeld.map((n) => `C${n}`))));
     }
     const faults = [...this.model.values()].filter((t) => t.fault === true);
     if (faults.length > 0) {

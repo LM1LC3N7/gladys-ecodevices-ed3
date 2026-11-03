@@ -6,14 +6,17 @@ production, injection, stockage, eau, gaz), la puissance de leurs tores, la
 tension secteur, leurs deux relais, les sorties de leurs extensions X-8R et
 leurs capteurs X-THL (température, humidité, luminosité).
 
-> Jamais testé avec un vrai appareil : écrit d’après la documentation de
-> l’API ED3 de GCE (Postman « API ED3 », liée depuis l’ED3) et les outils
-> libres de cce66 (Api-Deck et Mqtt-Deck ED3). Les réponses d’un vrai ED3
-> (celui de cce66, firmware 1.3.0) sont rejouées dans les tests : son
-> adresse MAC (inventée dans les tests, de même forme), ses compteurs et
-> les tores et entrées impulsions qui les alimentent, les unités des
-> compteurs téléinfo, de tores et d’eau, la puissance des tores.
-> Dites-nous ce que vous voyez sur le vôtre. Sans lien avec GCE Electronics.
+> Lectures vérifiées sur un vrai ED3 : celui de cce66, membre du forum
+> Gladys (firmware 1.3.0), qui a relevé ses réponses ; elles sont rejouées
+> dans les tests : son adresse MAC (inventée dans les tests, de même forme),
+> ses compteurs et les tores et entrées impulsions qui les alimentent, les
+> unités des compteurs téléinfo, de tores et d’eau, la puissance des tores.
+> Les commandes (relais R1 et R2) n’ont pas été testées sur un vrai
+> appareil, et aucune extension X-8R ni X-THL n’a encore été vue sur un vrai
+> ED3. Écrit d’après la documentation de l’API ED3 de GCE (Postman « API
+> ED3 », liée depuis l’ED3) et les outils libres de cce66 (Api-Deck et
+> Mqtt-Deck ED3). Dites-nous ce que vous voyez sur le vôtre. Sans lien avec
+> GCE Electronics.
 
 ## Installation
 
@@ -94,8 +97,12 @@ venait de l’adresse .161, les autres de .162 (le même ED3 d’après ses
 index ; question posée). L’eau et le gaz en mL, publiés en m³ : comparé à un vrai
 compteur d’eau (61 503,0 L au compteur, 61 503 000 sur l’ED3). Un compteur
 d’électricité alimenté par une entrée impulsions n’est pas proposé (son
-unité n’est pas vérifiée ; l’état le nomme), ni rien quand un tore est
-relié à un compteur hors de 11 à 24.
+unité n’est pas vérifiée ; l’état le nomme), ni un compteur relié à la fois
+à un tore et à une entrée impulsions. Quand l’ED3 liste les compteurs
+alimentés par ses entrées impulsions sous une autre forme (autre firmware),
+aucun compteur d’électricité qu’un tore n’alimente pas de façon connue
+n’est proposé (l’état les nomme). Les compteurs 11 à 24 ne sont pas proposés
+quand un tore est relié à un compteur hors de 11 à 24 (voir (¹)).
 
 (¹) Les compteurs qu’un tore peut alimenter (11 à 24) ne sont proposés que
 si l’ED3 liste les liens de ses tores sous la forme que donne un vrai

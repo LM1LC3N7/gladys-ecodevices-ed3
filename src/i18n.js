@@ -296,6 +296,12 @@ export const T = {
       `${list.en} (fed by a pulse input) not offered: the unit of an electricity counter fed by a pulse input is not checked.`,
       `${list.fr} (alimentés par une entrée impulsions) non proposés : l’unité d’un compteur d’électricité alimenté par une entrée impulsions n’est pas vérifiée.`,
     ),
+  // `ID_Logger_pulse` in another form: any electricity counter no clamp feeds may be fed by a pulse.
+  pulseLinksUnread: (list) =>
+    both(
+      `${list.en} not offered: this ED3 does not list the counters its pulse inputs feed in the expected form (another firmware?), and the unit of an electricity counter fed by a pulse input is not checked.`,
+      `${list.fr} non proposés : cet ED3 ne liste pas les compteurs alimentés par ses entrées impulsions sous la forme attendue (autre firmware ?), et l’unité d’un compteur d’électricité alimenté par une entrée impulsions n’est pas vérifiée.`,
+    ),
   indexHeld: (list) =>
     both(
       `Index held back (a jump or a drop, not sent to Gladys): ${list.en}. Only if it is right (a counter reset on the ED3), click "Accept the held index" twice: an accepted jump is counted in full by Gladys, at once.`,

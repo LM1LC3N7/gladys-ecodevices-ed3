@@ -14,7 +14,9 @@ to date at the end of every milestone.
       else address and port), Discover emptied when the box is unreachable or
       another one, another GCE box at the address said; fr/en docs. Tested
       against an in-memory ED3 on a virtual clock, and a real local HTTP
-      server on a real clock (x20). Never tested with a real device.
+      server on a real clock (x20). Readings checked against a real ED3
+      since (cce66's answers, firmware 1.3.0, replayed in the tests; banner
+      changed in 0.2.1); commands never tested on a real device.
 - [ ] **Review** (xhigh: relays, energy indexes), then corrections.
 - [ ] **First real device**: cce66 (forum t/11448), who has the boxes:
       his answers of 2026-10-31 (post 7) and 2026-11-02 (post 9: his
@@ -23,7 +25,7 @@ to date at the end of every milestone.
 - [ ] **Milestone 2**: the teleinfo frame (`object/tic/0?option=filter_state`:
       `SINSTS` apparent power for the energy contracts, the current tariff
       `LTARF` / `NTARF`), X-8R commands once their path is confirmed, the
-      pulse inputs, "Never tested" removed once cce66 confirms (ask Louis).
+      pulse inputs. ("Never tested" replaced in 0.2.1, Louis's decision.)
 - [ ] **Release**: review, `gi ci`, Release workflow, topic.
 
 ## Sources, and what two of them confirm
@@ -214,7 +216,9 @@ Next release: **minor** (0.2.0, new features), from Actions > Release.
   0-29, another length, a text, null): not guessed, the counters 11 to 24
   held as before, the status says the list is not in the expected form. A
   malformed `ID_Logger_pulse` only loses the pulse names (water and gas
-  hold their own unit). Tested in test/cce66.test.js, mutants killed.
+  hold their own unit; replaced in 0.2.1: the electricity counters no clamp
+  feeds are held then, see "Patch 0.2.1"). Tested in test/cce66.test.js,
+  mutants killed.
 - **Clamp power confirmed on a real ED3**: `puissance` mW = `irms` mA x
   `urms` V x `cosphi` % / 100 for his 8 clamps (within 0.1 %; T1 1 455 467
   for 6 580 x 235.53 x 0.9395). Published as one signed W feature, as
@@ -248,8 +252,9 @@ Next release: **minor** (0.2.0, new features), from Actions > Release.
   by the counter's number), not "negative = production". **A13** killed (an
   X-8R value of an overtaken round is applied); **A14** equivalent: the
   kept relay stamped with the round's time is pushed again with the same
-  value, which the publisher drops (unchanged), and the checks it runs see
-  a value newer than any command.
+  value, which the publisher drops (unchanged); the checks it runs see a
+  value newer than any command, but for one case (review r2 of 0.2.0, see
+  "Patch 0.2.1").
 - **m-19**: water mL confirmed (meter). **m-20**: the docs say what is
   confirmed by what (the clamp power by a real ED3 now), and that the MAC in
   the tests is invented. **m-21**: `app.stop()` in `t.after` in
@@ -349,13 +354,37 @@ Next release: **minor** (0.2.0, new features), from Actions > Release.
   the list, 11 to 24) are not offered until their unit is confirmed
   (question 2); the clamp power (mW, two sources) is kept.
 
-## Next patch (review cce66-n9 r2, 6b55531)
+## Patch 0.2.1 (review cce66-n9 r2 of 0.2.0, 6b55531)
 
-- m1: docs/en.md:90-91 and docs/fr.md:97-98 say "nor is anything" / « ni rien » offered when a
-  clamp is linked outside 11-24; only counters 11-24 are held back (C0, water, powers stay offered).
-- m2: holding back pulse-fed electricity counters needs a readable, unambiguous list. Two cases
-  still publish C11 in kWh with no checked unit: `ID_Logger_pulse` in another shape, and a counter
-  linked both by a clamp and a pulse input (ambiguous source cleared, `src/ed3/model.js:138`). Hold
-  back in both cases (or document the limit); update the stale line at TODO.md:216.
-- Note on A14: after an Off resent from /data without a read-back, R1's kept value can be older than
-  that resend; worst case one more resend, bounded by `resendMax`. Code is right.
+Next release: **patch** (0.2.1), from Actions > Release (the version is not
+set by hand).
+
+- [x] **Banner** (Louis's decision, 2026-11-03): "Never tested with a real
+      device" replaced in docs/fr.md, docs/en.md, README.md and the manifest
+      intro by what is checked: the readings against a real ED3 (cce66's,
+      firmware 1.3.0, his recorded answers replayed in the tests), the
+      commands (R1 / R2) not tested on a real device, no X-8R nor X-THL seen
+      on a real ED3. The manifest intro also lost "those fed by a clamp not
+      yet" (stale since 0.2.0). test/manifest.test.js checks the new wording.
+- [x] **m1**: docs/en.md and docs/fr.md no longer say "nor is anything" /
+      « ni rien » offered when a clamp is linked outside 11-24: only the
+      counters 11 to 24 are held then (C0, water, the powers stay offered).
+- [x] **m2**: a pulse input that may feed an electricity counter (0-24)
+      holds it, whatever the clamp links (parseEd3 `pulse`, pulseHolds):
+      `fed`, every electricity counter `ID_Logger_pulse` lists, one also
+      listed by a clamp included (its source ambiguous, no name), and a
+      pulse to C0-C10 with the clamp links unreadable; `unread`, when
+      `ID_Logger_pulse` is given in another form (length, counter numbers,
+      text, null...), every electricity counter no clamp is known to feed
+      (all 0-24 without readable clamp links; 11-24 then still said as
+      before). Status `pulseLinksUnread` (fr/en) names those holding an
+      index. `ID_Logger_pulse` absent (an older firmware) holds nothing more,
+      as before. On cce66's ED3 nothing changes (his pulses feed C25-C29).
+      Tests in test/cce66.test.js (parser and end to end).
+- [x] **A14 note** (no code change, the code is right): after a switch-off
+      resent from /data without a read back, a command on R2 that overtakes
+      the round keeps R1's value from the round before that resend; stamped
+      with the round's time, it passes the guard check (`at > guard.sentAt`)
+      with a value older than that switch-off. Worst case one more resend of
+      the switch-off (protective, bounded by `resendMax`). The 0.2.0 note
+      ("newer than any command") now says so.

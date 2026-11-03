@@ -53,7 +53,9 @@ test('the store basics, the same version everywhere (semver, never pinned), no k
     assert.match(flat, /not affiliated with GCE|sans lien avec GCE/i);
     assert.match(
       flat,
-      lang === 'en' ? /never tested with a real device/i : /jamais testé avec un vrai appareil/i,
+      lang === 'en'
+        ? /readings checked against a real ED3.*commands .*were not tested on a real device/i
+        : /lectures vérifiées sur un vrai ED3.*commandes .*n’ont pas été testées sur un vrai appareil/i,
     );
     assert.match(flat, /read only|lecture seule/i);
   }
@@ -127,7 +129,7 @@ test('the configuration matches the code; the key a secret without default', () 
     assert.ok(intro.description[lang].length <= 1000, `intro.${lang} over 1000 characters`);
     assert.match(
       intro.description[lang],
-      /Never tested with a real device|Jamais testé avec un vrai appareil/,
+      /commands not tested on a real device|commandes non testées sur un vrai appareil/,
     );
   }
 });

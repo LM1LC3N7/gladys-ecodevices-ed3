@@ -6,14 +6,16 @@ production, injection, storage, water, gas), the power of their current
 clamps, the mains voltage, their two relays, the outputs of their X-8R
 extensions and their X-THL sensors (temperature, humidity, luminosity).
 
-> Never tested with a real device: written from GCE's documentation of the
-> ED3 API (Postman "API ED3", linked from the ED3) and cce66's free tools
-> (ED3 Api-Deck and Mqtt-Deck). The answers of one real ED3 (cce66's,
-> firmware 1.3.0) are replayed in the tests: its MAC address (an invented
-> one of the same form in the tests), its counters and the clamps and pulse
-> inputs feeding them, the units of the teleinfo, clamp and water counters,
-> the clamp power. Tell us what you see on yours. Not affiliated with GCE
-> Electronics.
+> Readings checked against a real ED3: cce66's, a member of the Gladys
+> forum (firmware 1.3.0), who recorded its answers; they are replayed in the
+> tests: its MAC address (an invented one of the same form in the tests),
+> its counters and the clamps and pulse inputs feeding them, the units of
+> the teleinfo, clamp and water counters, the clamp power. The commands
+> (relays R1 and R2) were not tested on a real device, and no X-8R nor
+> X-THL extension has been seen on a real ED3 yet. Written from GCE's
+> documentation of the ED3 API (Postman "API ED3", linked from the ED3) and
+> cce66's free tools (ED3 Api-Deck and Mqtt-Deck). Tell us what you see on
+> yours. Not affiliated with GCE Electronics.
 
 ## Setup
 
@@ -87,8 +89,12 @@ would be 0.06 W. That second reading came from address .161, the others
 from .162 (the same ED3 by its indexes; asked). Water and gas in mL,
 published in m³: compared with a real water meter (61,503.0 L on the
 meter, 61,503,000 on the ED3). An electricity counter fed by a pulse input
-is not offered (its unit is not checked; the status names it), nor is
-anything when a clamp is linked to a counter outside 11 to 24.
+is not offered (its unit is not checked; the status names it), nor one
+listed both by a clamp and by a pulse input. When the ED3 lists the counters
+its pulse inputs feed in another form (another firmware), no electricity
+counter that a clamp is not known to feed is offered (the status names
+them). The counters 11 to 24 are not offered when a clamp is linked to a
+counter outside 11 to 24 (see (¹)).
 
 The ED3 is read every 15 seconds by default (10 s at least). A value the
 ED3 does not give (absent, a text, out of range, a voltage of 0 V) is not

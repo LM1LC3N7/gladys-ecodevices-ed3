@@ -24,7 +24,9 @@ the X-8R outputs (read only) and the X-THL sensors.
   gives one, else by its address): another one never gets their values nor
   their commands (but at the same address when it gives no MAC: see the guide).
 
-Never tested with a real device. Not affiliated with GCE Electronics.
+Readings checked against a real ED3 (cce66's, a member of the Gladys forum,
+firmware 1.3.0: its recorded answers replayed in the tests); commands not
+tested on a real device. Not affiliated with GCE Electronics.
 
 User guide: [English](docs/en.md) · [Français](docs/fr.md).
 

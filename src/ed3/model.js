@@ -142,6 +142,32 @@ function counterSources(lists, json) {
 /** The counters a clamp may feed (consumption, injection, production, storage). */
 const CLAMP_COUNTERS = { first: 11, last: 24 };
 
+/** An electricity counter (0-24: teleinfo, consumption, injection, production, storage). */
+const isElectricity = (n) => !isVolume(counterKind(n));
+
+/**
+ * The electricity counters a pulse input may feed, held (their unit is not checked for a
+ * pulse input): `fed`, every one `ID_Logger_pulse` lists, a counter listed twice included
+ * (its source ambiguous, a pulse input among them); `unread`, when `ID_Logger_pulse` is
+ * given in another form (another firmware): every electricity counter no clamp is known to
+ * feed (all of them without the clamp links in the expected form).
+ */
+function pulseHolds(lists, linksRead) {
+  const fed = new Set((lists.pulse.ids ?? []).filter((n) => n !== undefined && isElectricity(n)));
+  const unread = new Set();
+  if (lists.pulse.bad) {
+    const clampFed = new Set(
+      linksRead
+        ? [...lists.tore.ids, ...(lists.toreNeg.ids ?? [])].filter((n) => n !== undefined)
+        : [],
+    );
+    for (let n = 0; n < COUNTERS; n += 1) {
+      if (isElectricity(n) && !clampFed.has(n)) unread.add(n);
+    }
+  }
+  return { fed, unread };
+}
+
 /**
  * `object/ed3/0` -> Map(code -> target): the two relays, the clamps linked to a counter
  * (`ID_Logger_tore` or `ID_Logger_tore_neg` not 0: a clamp not set up is not offered), the
@@ -156,7 +182,8 @@ const CLAMP_COUNTERS = { first: 11, last: 24 };
  * with the links in the form above only: without them (absent, or in another form: another
  * firmware), the counters 11 to 24 are held as before, their source unknown. A counter fed
  * by a pulse input is published only as water or gas (mL, checked with a meter): an
- * electricity counter fed by one is held (parseCounters), its unit not checked.
+ * electricity counter fed by one, or that may be (listed twice, or `ID_Logger_pulse` in
+ * another form), is held (`pulse`, see pulseHolds and parseCounters), its unit not checked.
  */
 export function parseEd3(json) {
   if (!isObject(json)) return { error: 'bad_response' };
@@ -188,6 +215,7 @@ export function parseEd3(json) {
   if (!linksRead) {
     for (let n = CLAMP_COUNTERS.first; n <= CLAMP_COUNTERS.last; n += 1) held.add(n);
   }
+  const pulse = pulseHolds(lists, linksRead);
   // A clamp is offered when a counter takes its measure; with links of another form, when
   // either list holds something else than 0 there (a clamp not set up holds 0).
   const linked = (n) =>
@@ -218,7 +246,7 @@ export function parseEd3(json) {
   if (volts !== undefined) {
     targets.set('mains', { code: 'mains', kind: KINDS.MAINS, value: volts });
   }
-  return { targets, held, sources, linksRead };
+  return { targets, held, sources, linksRead, pulse };
 }
 
 /** The relay states of a read back (`object/ed3/0?option=filter_state`): Map(code -> 0 | 1 | undefined). */
@@ -262,9 +290,10 @@ export function indexValue(raw, kind) {
  * `core_logger?option=filter_state` -> Map(code -> target): every counter
  * listed (by its `_id`) but those held (`held`, see parseEd3), its index
  * converted; `names`: Map(n -> name) when read; `sources`: Map(n -> the input
- * feeding it, parseEd3). Not a list: not an ED3 answer.
+ * feeding it, parseEd3); `pulse`: the electricity counters a pulse input feeds or may
+ * feed (parseEd3), held. Not a list: not an ED3 answer.
  */
-export function parseCounters(json, names, held, sources) {
+export function parseCounters(json, names, held, sources, pulse) {
   const items = list(json);
   if (!items) return { error: 'bad_response' };
   const targets = new Map();
@@ -273,6 +302,8 @@ export function parseCounters(json, names, held, sources) {
   const skipped = [];
   /** Electricity counters fed by a pulse input holding an index: the same, said apart. */
   const pulseSkipped = [];
+  /** Electricity counters a pulse input may feed (`ID_Logger_pulse` in another form): the same. */
+  const pulseUnreadSkipped = [];
   for (const item of items) {
     const n = counterNumber(own(item, '_id'));
     if (n === undefined || seen.has(n)) continue;
@@ -285,8 +316,13 @@ export function parseCounters(json, names, held, sources) {
     const kind = counterKind(n);
     const value = indexValue(own(item, 'index'), kind);
     // Fed by a pulse input but not water nor gas: its unit is not checked (Wh assumed): held.
-    if (sources?.get(n)?.from === 'pulse' && !isVolume(kind)) {
+    if ((sources?.get(n)?.from === 'pulse' || pulse?.fed?.has(n)) && !isVolume(kind)) {
       if (value !== undefined) pulseSkipped.push(n);
+      continue;
+    }
+    // Maybe fed by one (the pulse links unreadable): held the same.
+    if (pulse?.unread?.has(n)) {
+      if (value !== undefined) pulseUnreadSkipped.push(n);
       continue;
     }
     targets.set(`c${n}`, {
@@ -305,6 +341,7 @@ export function parseCounters(json, names, held, sources) {
     targets,
     skipped: skipped.sort((a, b) => a - b),
     pulseSkipped: pulseSkipped.sort((a, b) => a - b),
+    pulseUnreadSkipped: pulseUnreadSkipped.sort((a, b) => a - b),
   };
 }
 
