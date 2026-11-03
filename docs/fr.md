@@ -10,7 +10,9 @@ leurs capteurs X-THL (température, humidité, luminosité).
 > l’API ED3 de GCE (Postman « API ED3 », liée depuis l’ED3) et les outils
 > libres de cce66 (Api-Deck et Mqtt-Deck ED3). Les réponses d’un vrai ED3
 > (celui de cce66, firmware 1.3.0) sont rejouées dans les tests : son
-> adresse MAC, ses compteurs, les unités des compteurs téléinfo et eau.
+> adresse MAC (inventée dans les tests, de même forme), ses compteurs et
+> les tores et entrées impulsions qui les alimentent, les unités des
+> compteurs téléinfo, de tores et d’eau, la puissance des tores.
 > Dites-nous ce que vous voyez sur le vôtre. Sans lien avec GCE Electronics.
 
 ## Installation
@@ -62,39 +64,52 @@ l’intégration de ce boîtier.
 | Compteurs 1 à 10 (tarifs téléinfo)      | capteur simple « Index du tarif (kWh) », pas compté deux fois    | `C1`               |
 | Compteurs 22 à 24 (stockage) (¹)        | capteur simple « Index de stockage (kWh) »                       | `C22`              |
 | Compteurs 25 à 27 (eau), 28 et 29 (gaz) | volume (m³), hors suivi d’énergie                                | `C25`, `C28`       |
-| Tore relié à un compteur                | puissance (W)                                                    | `T1`               |
+| Tore relié à un compteur                | puissance (W), signée (²)                                        | `T1`               |
 | Tension d’alimentation                  | tension (V)                                                      | `U`                |
 | X-THL                                   | température (°C), humidité (%), luminosité (lux)                 | `XTHL4325376`      |
 
 Les numéros des compteurs sont ceux de l’ED3 (GCE les attribue par
-catégorie). Les noms que vous leur avez donnés sur l’ED3 sont repris dans
-Découverte (relus toutes les 10 minutes) ; un nom changé ensuite sur l’ED3
-ne renomme pas un appareil déjà créé. Un compteur à 0 (pas configuré, ou pas
-encore lu par l’ED3) n’est pas proposé ; un tore sans compteur non plus.
+catégorie). Un compteur alimenté par un tore ou une entrée impulsions porte
+son nom dans la Découverte, tel que l’ED3 les liste (`ID_Logger_tore`,
+`ID_Logger_tore_neg`, `ID_Logger_pulse`, `ToreName`, `PulseName`) :
+« T1-EDF · Consommation (C11) », « T1-EDF (négatif) · Injection (C19) »
+pour le compteur de l’autre sens du tore, « Eau · Eau (C25) ». Les autres
+prennent le nom donné au compteur sur l’ED3 (relu toutes les 10 minutes).
+Un nom changé ensuite sur l’ED3 ne renomme pas un appareil déjà créé. Un
+compteur à 0 (pas configuré, ou pas encore lu par l’ED3) n’est pas
+proposé ; un tore qui n’alimente aucun compteur (0 dans les deux listes)
+non plus.
 L’ED3 peut lister moins de 30 compteurs (un vrai en listait 26) : un
 compteur est reconnu par son identifiant ED3, jamais par sa place dans la
 liste, et un compteur absent de la liste n’est pas proposé.
 
-Unités : les index téléinfo sont en Wh sur l’ED3 (vérifié sur un vrai : son
-compteur 0 recoupait, à quelques minutes près, le même Linky lu par un
-Eco-Devices RT2), publiés en kWh ; l’eau et le gaz en mL, publiés en m³ (un
-vrai compteur d’eau : 60 707 000 mL = 60,707 m³).
+Unités : tous les index d’électricité sont en Wh sur l’ED3, publiés en
+kWh. Vérifié sur un vrai : son compteur 0 (téléinfo) recoupait, à quelques
+minutes près, le même Linky lu par un Eco-Devices RT2 ; le compteur d’un de
+ses tores a pris 4 029 pendant que sa téléinfo prenait 50 312 Wh, à 57 W
+contre 811 W en moyenne (des Wh, pas des mWh). L’eau et le gaz en mL,
+publiés en m³ : comparé à un vrai compteur d’eau (61 503,0 L au compteur,
+61 503 000 sur l’ED3).
 
-(¹) **Un compteur alimenté par un tore n’est pas proposé dans cette version**
-(ceux que l’ED3 relie à un tore dans `ID_Logger_tore`) : l’unité de son
-index n’est pas confirmée (Wh selon GCE, mais l’exemple de GCE lui-même fait
-penser à des mWh, ce qui donnerait des valeurs 1000 fois trop grandes). Les
-valeurs d’un vrai ED3 penchent pour le Wh, mais n’ont pas été comparées à
-la page de l’ED3, et cet ED3 n’a pas dit quels compteurs ses tores
-alimentent : un index à vie 1000 fois faux resterait dans l’historique
-d’énergie de Gladys, donc ils attendent cette vérification. La puissance du
-tore, elle, est confirmée (mW, publiée en W). Ils seront proposés une fois
-l’unité vérifiée sur un vrai ED3. L’état nomme ceux qui ont un index
-(« C12, C13 (alimentés par un tore) : non proposés tant que leur unité n’est
-pas confirmée »). Un ED3 qui ne donne pas cette liste ne dit pas quels
-compteurs ses tores alimentent : la source des compteurs 11 à 24 est alors
-inconnue, et tous sont retenus de la même façon, ce que dit l’état
-(« C11, C19 (source inconnue : …) »).
+(¹) Les compteurs qu’un tore peut alimenter (11 à 24) ne sont proposés que
+si l’ED3 liste les liens de ses tores sous la forme que donne un vrai
+(`ID_Logger_tore` : 8 valeurs, chacune 0 ou l’identifiant d’un compteur ;
+`ID_Logger_tore_neg` de même quand il est donné) : c’est ainsi que leur
+unité (Wh) a été vérifiée. Un ED3 qui ne donne pas cette liste, ou la donne
+sous une autre forme (autre firmware), ne dit pas quels compteurs ses tores
+alimentent : les compteurs 11 à 24 sont alors retenus, et l’état nomme ceux
+qui ont un index (« C11, C19 non proposés : cet ED3 ne liste pas les
+compteurs alimentés par ses tores sous la forme attendue… »). Rien n’est
+deviné d’une liste d’une autre forme.
+
+(²) La puissance d’un tore est le `puissance` de l’ED3 (mW, publiée en W, une
+décimale) : sur un vrai ED3, elle vaut courant × tension × facteur de
+puissance pour chaque tore (1 455 467 mW pour 6,58 A × 235,5 V × 0,94). Son
+signe est gardé : positive quand le tore alimente son compteur
+(`ID_Logger_tore`, consommation), négative dans l’autre sens
+(`ID_Logger_tore_neg` : production, injection, batterie qui se décharge).
+Un tore relié dans un seul sens montre quand même l’autre sens en
+puissance négative.
 
 L’ED3 est lu toutes les 15 secondes par défaut (10 s au moins). Une valeur
 que l’ED3 ne donne pas (absente, un texte, hors plage, une tension de 0 V)
@@ -288,10 +303,12 @@ remet pas. Ils reviennent à la première lecture réussie.
 
 - Relais R1 et R2, compteurs, tores, tension, X-8R (lecture seule) et
   X-THL ; pas la trame téléinfo détaillée (puissance apparente, tarif en
-  cours), les entrées impulsions, les commandes X-8R, les plannings, les
+  cours), l’état des entrées impulsions elles-mêmes (les compteurs qu’elles
+  alimentent sont lus), les commandes X-8R, les plannings, les
   variables virtuelles ni le Modbus dans cette version.
-- Le signe de la puissance d’un tore qui mesure une production n’est pas
-  documenté : la puissance est publiée telle que l’ED3 la donne (en W).
+- La puissance d’un tore est une seule valeur signée (W) : pas de
+  fonctionnalité de production séparée ; les compteurs de chaque sens
+  portent l’énergie.
 - L’intégration lit l’API HTTP locale, pas le MQTT de l’ED3.
 - Trois ED3 au plus par intégration.
 - http seulement (l’ED3 répond en http sur le réseau local).

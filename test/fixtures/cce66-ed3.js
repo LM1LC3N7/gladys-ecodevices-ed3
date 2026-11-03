@@ -63,3 +63,67 @@ export const MISSING = [18, 21, 24, 27];
 
 /** The counters 11 to 24 that hold an index (their source is not known: no `ID_Logger_tore`). */
 export const HELD = [11, 12, 13, 15, 16, 17, 19, 20, 22, 23];
+
+// -----------------------------------------------------------------------------
+// `GET /api/object/ed3?ApiKey=…` of the same ED3 (t/11448 post 9, 2026-11-02),
+// copied as he gave it: the links of his 8 clamps (`ID_Logger_tore` positive,
+// `ID_Logger_tore_neg` negative) and 4 pulse inputs to their counters (`_id`,
+// 0 = none), their names, and the measures (`puissance` mW, `irms` mA as
+// signed texts, `cosphi` %, `urms` V).
+// -----------------------------------------------------------------------------
+
+export const OBJECT_ED3 = {
+  _id: 1245184,
+  name: 'ED3',
+  errorStatus: '0x0000',
+  ID_Logger_tore: [851979, 0, 0, 851982, 0, 851988, 851990, 851984],
+  ID_Logger_tore_neg: [851987, 851980, 851981, 0, 851983, 851985, 851991, 0],
+  ConsoTore: [50, 50, 20, 50, 50, 20, 20, 20],
+  ToreName: [
+    'T1-EDF',
+    'T2-Maison',
+    'T3-Piscine',
+    'T4-Load',
+    'T5-Grid',
+    'T6-Solaire',
+    'T7-Batterie +',
+    'T8-Batterie -',
+  ],
+  ID_Logger_pulse: [851993, 851994, 851996, 851997],
+  ConsoPulse: [1000, 1, 1000000, 1],
+  PulseName: ['Eau', 'Pulse 2', 'Tri', 'Pulse 4'],
+  RelayName: ['Relay 1', 'Relay 2'],
+  RelayMemoryMode: true,
+  refPowerFactor: 0,
+  Relay_state: [false, false],
+  Relay_command: [false, false],
+  Pulse_state: [false, false, false, false],
+  Pulse_cpt: [0, 0, 0, 0],
+  Pulse_inst: [0, 0, 0, 0],
+  Pulse_conso: [0, 0, 0, 0],
+  powerFactor: 66.65819,
+  cosphi: [93.94736, 5.895676, 0, 0, 5.707409, 0, 52.18113, 53.8461],
+  irms: ['6580', '-947', '0', '0', '-939', '0', '-519', '-528'],
+  conso: [0, 0, 0, 0, 0, 0, 0, 857],
+  puissance: [1455467, -13160, 0, 0, -12625, 0, -63810, -67039],
+  urms: 235.5297,
+};
+
+/** Each counter of his and the input feeding it (clamp or pulse, its number, negative). */
+export const LINKS = [
+  [11, 'clamp', 1, false, 'T1-EDF'],
+  [19, 'clamp', 1, true, 'T1-EDF'],
+  [12, 'clamp', 2, true, 'T2-Maison'],
+  [13, 'clamp', 3, true, 'T3-Piscine'],
+  [14, 'clamp', 4, false, 'T4-Load'],
+  [15, 'clamp', 5, true, 'T5-Grid'],
+  [20, 'clamp', 6, false, 'T6-Solaire'],
+  [17, 'clamp', 6, true, 'T6-Solaire'],
+  [22, 'clamp', 7, false, 'T7-Batterie +'],
+  [23, 'clamp', 7, true, 'T7-Batterie +'],
+  [16, 'clamp', 8, false, 'T8-Batterie -'],
+  [25, 'pulse', 1, false, 'Eau'],
+  [26, 'pulse', 2, false, 'Pulse 2'],
+  [28, 'pulse', 3, false, 'Tri'],
+  [29, 'pulse', 4, false, 'Pulse 4'],
+];

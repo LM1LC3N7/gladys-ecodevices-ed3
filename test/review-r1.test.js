@@ -459,26 +459,28 @@ test('m-6: an IPX800 V5 found where the ED3 was: no switch-off sent to it, kept 
   app.stop();
 });
 
-test('m-8: a counter fed by a clamp is never published as an energy index (unit not confirmed)', async () => {
+test('m-8 (0.2.0): a counter fed by a clamp is published in kWh once the links are read', async (t) => {
   const world = fakeEd3();
   world.index.set(12, 407_230_100);
+  world.index.set(14, 1_000);
   const { app, gladys, start } = await setup({ devices: [created('counter', 'c12')], world });
+  t.after(() => app.stop());
   await start();
   await app.flush();
-  assert.ok(!gladys.fake.discoveredDevices.some((d) => d.external_id === 'ext:ed3:counter:c12'));
-  assert.equal(last(gladys, 'c12'), undefined);
+  const found = gladys.fake.discoveredDevices.find((d) => d.external_id === 'ext:ed3:counter:c14');
+  assert.match(found?.name ?? '', /^Tore 2 · (Consumption|Consommation) \(C14\)$/);
+  assert.equal(last(gladys, 'c12'), 407230.1);
   assert.ok(gladys.fake.discoveredDevices.some((d) => d.external_id === 'ext:ed3:clamp:t1'));
-  // Without the list of the clamps: counters 11 to 24 are taken as fed by one.
-  const { parseCounters } = await import('../src/ed3/model.js');
-  const { parseEd3 } = await import('../src/ed3/model.js');
-  const { clampCounters } = parseEd3({ Relay_state: [false, false] });
+  // Without the list of the clamps: counters 11 to 24 are held (their source unknown).
+  const { parseCounters, parseEd3 } = await import('../src/ed3/model.js');
+  const { held, sources } = parseEd3({ Relay_state: [false, false] });
   const { targets } = parseCounters(
     [11, 19, 24, 25].map((n) => ({ _id: 851968 + n, index: 1000 })),
     undefined,
-    clampCounters,
+    held,
+    sources,
   );
   assert.deepEqual([...targets.keys()], ['c25']);
-  app.stop();
 });
 
 test('a slot found a duplicate: nothing in Discover, no command may leave, whatever asks', async () => {

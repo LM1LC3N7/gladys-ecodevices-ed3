@@ -85,9 +85,74 @@ function relayStates(json) {
 }
 
 /**
- * `object/ed3/0` -> Map(code -> target): the two relays, the clamps linked
- * to a counter (`ID_Logger_tore` not 0: a clamp not set up is not offered),
- * the mains voltage. An answer without `Relay_state` is not an ED3.
+ * One list of counter links of `object/ed3/0` (`ID_Logger_tore`, `ID_Logger_tore_neg`,
+ * `ID_Logger_pulse`): `{ ids }` (per input, the counter number or undefined for 0),
+ * `{ absent: true }` or `{ bad: true }`. Only the form a real ED3 gives (firmware 1.3.0) and
+ * GCE documents is taken: a list of exactly `size` entries, each 0 or a counter `_id`
+ * (851968 + n). Another length, a counter number (0-29) instead of an `_id`, a text: bad
+ * (another firmware), never guessed.
+ */
+function linkList(value, size) {
+  if (value === undefined) return { absent: true };
+  if (!Array.isArray(value) || value.length !== size) return { bad: true };
+  const ids = [];
+  for (const id of value) {
+    if (id === 0) {
+      ids.push(undefined);
+      continue;
+    }
+    const n = counterNumber(id);
+    if (n === undefined) return { bad: true };
+    ids.push(n);
+  }
+  return { ids };
+}
+
+/**
+ * The inputs that feed each counter: Map(n -> { from: 'clamp' | 'pulse', input, negative,
+ * name }). A counter listed twice (two inputs, or both directions) is ambiguous: no source.
+ */
+function counterSources(lists, json) {
+  const sources = new Map();
+  const twice = new Set();
+  const clampNames = own(json, 'ToreName');
+  const pulseNames = own(json, 'PulseName');
+  for (const [from, negative, list, names] of [
+    ['clamp', false, lists.tore, clampNames],
+    ['clamp', true, lists.toreNeg, clampNames],
+    ['pulse', false, lists.pulse, pulseNames],
+  ]) {
+    if (!list?.ids) continue;
+    list.ids.forEach((n, i) => {
+      if (n === undefined) return;
+      if (sources.has(n)) twice.add(n);
+      sources.set(n, {
+        from,
+        input: i + 1,
+        negative,
+        name: cleanName(Array.isArray(names) ? names[i] : undefined),
+      });
+    });
+  }
+  for (const n of twice) sources.delete(n);
+  return sources;
+}
+
+/** The counters a clamp may feed (consumption, injection, production, storage). */
+const CLAMP_COUNTERS = { first: 11, last: 24 };
+
+/**
+ * `object/ed3/0` -> Map(code -> target): the two relays, the clamps linked to a counter
+ * (`ID_Logger_tore` or `ID_Logger_tore_neg` not 0: a clamp not set up is not offered), the
+ * mains voltage; `sources`: the input feeding each counter (its name in Gladys); `held`: the
+ * counters not published. An answer without `Relay_state` is not an ED3.
+ *
+ * The index of a counter fed by a clamp is in Wh as the others (GCE: `index` "en wH" for
+ * every Core Logger; a real ED3, firmware 1.3.0: the index of its battery clamp grew 4 029
+ * in the time the teleinfo grew 50 312 Wh, its 5-minute average 57 W against 811 W: Wh, not
+ * mWh). That was checked with the links in the form above only: without them (absent, or in
+ * another form: another firmware), the counters 11 to 24 are held as before, their source
+ * unknown.
  */
 export function parseEd3(json) {
   if (!isObject(json)) return { error: 'bad_response' };
@@ -104,43 +169,52 @@ export function parseEd3(json) {
       value: relays[n - 1],
     });
   }
-  const loggers = own(json, 'ID_Logger_tore');
-  const powers = own(json, 'puissance');
-  // The counters fed by a clamp: their index unit is not confirmed (Wh or mWh, see TODO.md),
-  // so they are not published as energy indexes. Without the list (`clampsListed` false), the
-  // source of the counters a clamp may feed (11 to 24) is unknown: all of them are held.
-  const clampCounters = new Set();
-  if (Array.isArray(loggers)) {
-    for (const id of loggers.slice(0, LIMITS_ED3.clamps)) {
-      const n = counterNumber(id);
-      if (n !== undefined) clampCounters.add(n);
-    }
-  } else {
-    for (let n = 11; n <= 24; n += 1) clampCounters.add(n);
+  const rawTore = own(json, 'ID_Logger_tore');
+  const rawToreNeg = own(json, 'ID_Logger_tore_neg');
+  const lists = {
+    tore: linkList(rawTore, LIMITS_ED3.clamps),
+    toreNeg: linkList(rawToreNeg, LIMITS_ED3.clamps),
+    pulse: linkList(own(json, 'ID_Logger_pulse'), LIMITS_ED3.pulses),
+  };
+  // The links are read when `ID_Logger_tore` has the expected form, and `ID_Logger_tore_neg`
+  // too when given (GCE's example has none: an older firmware).
+  const linksRead = lists.tore.ids !== undefined && !lists.toreNeg.bad;
+  const sources = linksRead ? counterSources(lists, json) : new Map();
+  const held = new Set();
+  if (!linksRead) {
+    for (let n = CLAMP_COUNTERS.first; n <= CLAMP_COUNTERS.last; n += 1) held.add(n);
   }
+  // A clamp is offered when a counter takes its measure; with links of another form, when
+  // either list holds something else than 0 there (a clamp not set up holds 0).
+  const linked = (n) =>
+    linksRead
+      ? lists.tore.ids[n - 1] !== undefined || lists.toreNeg.ids?.[n - 1] !== undefined
+      : [rawTore, rawToreNeg].some(
+          (raw) => Array.isArray(raw) && isId(raw[n - 1]) && raw[n - 1] !== 0,
+        );
   const clampNames = own(json, 'ToreName');
-  if (Array.isArray(loggers)) {
-    for (let n = 1; n <= LIMITS_ED3.clamps; n += 1) {
-      const logger = loggers[n - 1];
-      if (!isId(logger) || logger === 0) continue;
-      // `puissance`: mW (GCE: "Puissance lue à chaque entrée Tore en mW").
-      const mw = Array.isArray(powers) ? powers[n - 1] : undefined;
-      const watts = typeof mw === 'number' ? measure(round(mw / 1000, 1), RANGES.power) : undefined;
-      targets.set(`t${n}`, {
-        code: `t${n}`,
-        kind: KINDS.CLAMP,
-        n,
-        name: cleanName(Array.isArray(clampNames) ? clampNames[n - 1] : undefined),
-        value: watts,
-      });
-    }
+  const powers = own(json, 'puissance');
+  for (let n = 1; n <= LIMITS_ED3.clamps; n += 1) {
+    if (!linked(n)) continue;
+    // `puissance`: mW (GCE: "Puissance lue à chaque entrée Tore en mW"; a real ED3: 1 455 467
+    // for 6 580 mA x 235.53 V x cos phi 0.9395 = 1 456 W), signed: positive while the clamp
+    // feeds its `ID_Logger_tore` counter, negative its `ID_Logger_tore_neg` one.
+    const mw = Array.isArray(powers) ? powers[n - 1] : undefined;
+    const watts = typeof mw === 'number' ? measure(round(mw / 1000, 1), RANGES.power) : undefined;
+    targets.set(`t${n}`, {
+      code: `t${n}`,
+      kind: KINDS.CLAMP,
+      n,
+      name: cleanName(Array.isArray(clampNames) ? clampNames[n - 1] : undefined),
+      value: watts,
+    });
   }
   const urms = own(json, 'urms');
   const volts = typeof urms === 'number' ? measure(round(urms, 1), RANGES.voltage) : undefined;
   if (volts !== undefined) {
     targets.set('mains', { code: 'mains', kind: KINDS.MAINS, value: volts });
   }
-  return { targets, clampCounters, clampsListed: Array.isArray(loggers) };
+  return { targets, held, sources, linksRead };
 }
 
 /** The relay states of a read back (`object/ed3/0?option=filter_state`): Map(code -> 0 | 1 | undefined). */
@@ -182,22 +256,23 @@ export function indexValue(raw, kind) {
 
 /**
  * `core_logger?option=filter_state` -> Map(code -> target): every counter
- * listed (by its `_id`) but those fed by a clamp (`clampCounters`), its index
- * converted; `names`: Map(n -> name) when read. Not a list: not an ED3 answer.
+ * listed (by its `_id`) but those held (`held`, see parseEd3), its index
+ * converted; `names`: Map(n -> name) when read; `sources`: Map(n -> the input
+ * feeding it, parseEd3). Not a list: not an ED3 answer.
  */
-export function parseCounters(json, names, clampCounters) {
+export function parseCounters(json, names, held, sources) {
   const items = list(json);
   if (!items) return { error: 'bad_response' };
   const targets = new Map();
   const seen = new Set();
-  /** Counters fed by a clamp that hold an index: not offered, named in the status. */
+  /** Counters held that hold an index: not offered, named in the status. */
   const skipped = [];
   for (const item of items) {
     const n = counterNumber(own(item, '_id'));
     if (n === undefined || seen.has(n)) continue;
     seen.add(n);
-    // Fed by a clamp: its unit is not confirmed (Wh or mWh): never an index (TODO.md).
-    if (clampCounters?.has(n)) {
+    // Held (its source unknown, see parseEd3): never an index.
+    if (held?.has(n)) {
       if (indexValue(own(item, 'index'), counterKind(n)) !== undefined) skipped.push(n);
       continue;
     }
@@ -209,6 +284,7 @@ export function parseCounters(json, names, clampCounters) {
       n,
       counter: kind,
       name: names?.get(n),
+      source: sources?.get(n),
       value,
       // No index (0: not set up, or not read by the ED3 yet): not offered in Discover.
       idle: value === undefined,

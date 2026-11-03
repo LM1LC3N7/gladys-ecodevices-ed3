@@ -6,15 +6,19 @@
 // and as cce66's ED3 Api-Deck v2.1 uses it (MIT, a tester written by a user):
 //   GET|PUT /api/<path>?ApiKey=<API key>
 //   - `object/ed3/0`: the ED3 itself: `RelayName` (2), `Relay_state` (2
-//     booleans), `ToreName` (8), `ID_Logger_tore` (8: the counter of each
-//     clamp, 0 = none), `puissance` (8, mW), `urms` (V);
+//     booleans), `ToreName` (8), `ID_Logger_tore` (8: the counter `_id` each
+//     clamp feeds, 0 = none), `ID_Logger_tore_neg` (8: the counter of its
+//     other direction; not in GCE's example), `PulseName` and
+//     `ID_Logger_pulse` (4, the same for the pulse inputs), `puissance` (8,
+//     mW, signed), `irms` (8, mA, signed texts on a real ED3), `cosphi` (8,
+//     %), `urms` (V); a real ED3 (cce66, 2026-11-02) gave all of them;
 //     `?option=filter_state` the states only (the read back of a relay);
 //   - `object/ed3/0/SetOnR/<1|2>` / `SetOffR/<1|2>` (GET): one relay on / off;
 //   - `object/core_logger?option=filter_state`: the counters (up to 30; a
 //     real ED3, firmware 1.3.0, listed 26: an entry may be missing, a counter
 //     is known by its `_id` only) `{ _id, index, indexprix, moyenne, instMax,
-//     instMin, tarif }`, `index` in Wh (electricity) or mL (water, gas),
-//     "strictly increasing";
+//     instMin, tarif }`, `index` in Wh (electricity, a clamp's counter too)
+//     or mL (water, gas: compared with a real meter), "strictly increasing";
 //     `?option=filter_name`: `{ _id, name }`;
 //   - `ebx/x8r`: the X-8R extensions `{ _id, name, codeExt, state[8], command[8] }`;
 //   - `ebx/xthl`: the X-THL `{ _id, name, codeExt, Temperature, Humidite,
@@ -129,6 +133,8 @@ export const POLL_INTERVAL = { min: 10, max: 300, default: 15 };
 export const LIMITS_ED3 = {
   relays: 2,
   clamps: 8,
+  /** The pulse inputs (`ID_Logger_pulse`, `PulseName`). */
+  pulses: 4,
   x8: 8,
   extensions: 8,
   /** The largest id taken (objects, extensions). */
@@ -140,7 +146,7 @@ export const RANGES = {
   temperature: { min: -40, max: 85 },
   humidity: { min: 0, max: 100 },
   luminosity: { min: 0, max: 200_000 },
-  /** W: a clamp may read a production (its sign is not documented: signed). */
+  /** W, signed: negative in the direction of the clamp's `ID_Logger_tore_neg` counter. */
   power: { min: -100_000, max: 100_000 },
   /** V: 0 is no measurement (the ED3 not powered by the mains it measures). */
   voltage: { min: 80, max: 300 },

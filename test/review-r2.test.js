@@ -146,18 +146,27 @@ test('N18: a slot moved to another address forgets the MAC it read before', asyn
 
 // --- m-11 ----------------------------------------------------------------------------
 
-test('m-11: the counters fed by a clamp are named in the status', async () => {
+test('m-11 (0.2.0): links of another form: the counters 11 to 24 holding an index are named', async (t) => {
   const world = fakeEd3();
+  // Counter numbers instead of `_id`s: another firmware, never guessed.
+  world.loggers = [12, 14, 0, 0, 0, 0, 0, 0];
   world.index.set(12, 407_230_100);
   world.index.set(14, 1_000);
   const { app, gladys, start } = await setup({ world });
+  t.after(() => app.stop());
   await start();
   assert.match(
     message(gladys),
-    /C12, C14 \(fed by a clamp\): not offered until their unit is confirmed/,
+    /C11, C12, C14, C19, C20 not offered: this ED3 does not list the counters/,
   );
-  assert.match(message(gladys, 'fr'), /C12, C14 \(alimentés par un tore\) : non proposés/);
-  app.stop();
+  assert.match(
+    message(gladys, 'fr'),
+    /C11, C12, C14, C19, C20 non proposés : cet ED3 ne liste pas/,
+  );
+  const ids = (gladys.fake.discoveredDevices ?? []).map((d) => d.external_id);
+  assert.ok(!ids.includes('ext:ed3:counter:c12') && !ids.includes('ext:ed3:counter:c14'));
+  // The clamps keep their power: a value there is a clamp set up.
+  assert.ok(ids.includes('ext:ed3:clamp:t1'));
 });
 
 // --- m-12: N17 ---------------------------------------------------------------------------

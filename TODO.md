@@ -17,8 +17,9 @@ to date at the end of every milestone.
       server on a real clock (x20). Never tested with a real device.
 - [ ] **Review** (xhigh: relays, energy indexes), then corrections.
 - [ ] **First real device**: cce66 (forum t/11448), who has the boxes:
-      his answers of 2026-10-31 received (identity, counters, units of the
-      teleinfo and water), replayed in the tests; the questions left below.
+      his answers of 2026-10-31 (post 7) and 2026-11-02 (post 9: his
+      `object/ed3`, his water meter) received and replayed in the tests;
+      the questions left below.
 - [ ] **Milestone 2**: the teleinfo frame (`object/tic/0?option=filter_state`:
       `SINSTS` apparent power for the energy contracts, the current tariff
       `LTARF` / `NTARF`), X-8R commands once their path is confirmed, the
@@ -75,9 +76,12 @@ test/fixtures/cce66-ed3.js, his masked MAC replaced by an invented one):
       read the same Linky at 132 533 718 a few minutes apart (143 apart, an
       average of 811 W: about 10 minutes in Wh, impossible in kWh): **Wh**,
       published in kWh. Water (counter 25) 60 707 000: mL as GCE says,
-      60.707 m³, plausible; published in m³ (`volume-sensor`).
-- [ ] Q2, clamps: not settled (no `object/ed3/0`, no comparison with the
-      ED3's page). Held, see "Decisions after cce66's answers".
+      60.707 m³; compared with his meter in post 9 (confirmed); published
+      in m³ (`volume-sensor`).
+- [x] Q2, clamps (post 9, 2026-11-02): his `object/ed3` (see "Decisions
+      for 0.2.0"): links in `_id`s, a negative list, the clamp power in mW.
+- [x] Water (post 9): his meter shows 61 503.0 L, the ED3 61 503 000:
+      **mL confirmed** (m-19 closed).
 - [x] Q3: unused counters at 0 (index and all fields); **not always 30
       entries**: his list has 26 (851986, 851989, 851992, 851995 missing:
       counters 18, 21, 24, 27). The number of a counter is its `_id` -
@@ -90,18 +94,17 @@ test/fixtures/cce66-ed3.js, his masked MAC replaced by an invented one):
 
 ## Questions left for cce66 (short, for the forum)
 
-1. L’adresse `http://<ED3>/api/object/ed3/0?ApiKey=…` (clé retirée) : la
-   réponse complète, surtout `ID_Logger_tore` et `ToreName`. Elle dit quels
-   compteurs viennent de vos pinces.
-2. Pour un de ces compteurs de pince (par exemple le 11, index 3 293 592) :
-   quelle valeur affiche la page de l’ED3, et dans quelle unité (kWh, Wh) ?
+1. Le relevé `objDescriptor` venait de `192.168.1.161`, les autres de
+   `.162` : le même ED3 (faute de frappe) ? Ses index le recoupent.
+2. Le tore T8 (« T8-Batterie - ») ne relie aucun compteur négatif alors
+   qu’il mesure −67 W, et c’est le seul avec `conso` non nul (857) : il est
+   bien branché ? `conso` change-t-il avec le temps ?
 3. Une fois le X-8R recâblé : l’adresse `…/api/ebx/x8r?ApiKey=…`, puis
    `…/api/ebx/x8r/0/SetOnR/1?ApiKey=…` allume-t-elle la sortie 1 (0 = la
    place dans la liste), ou faut-il `…/api/ebx/x8r/4259840/SetOnR/1` (le
    `_id`) ? Et ce que répond l’ED3 à cet appel.
-4. Une pince qui mesure une production (solaire) : la puissance est-elle
-   négative ?
-5. Les noms dans la Découverte et la ligne d’état : clairs pour vous ?
+4. Les noms dans la Découverte (« T1-EDF · Consommation (C11) »,
+   « T1-EDF (négatif) · Injection (C19) ») : clairs pour vous ?
 
 ## Decisions
 
@@ -137,8 +140,10 @@ output-index` (never an energy-sensor index: it would be counted as
   ED3's own (not built here): a drop is accepted like a jump (two clicks).
   The guard state belongs to the device (`device.id`): a device created
   again starts from Gladys's last value.
-- **Clamps**: only those linked to a counter (`ID_Logger_tore` not 0), power
-  in W, signed range (±100 kW): the sign of a production is not documented.
+- **Clamps**: only those linked to a counter (`ID_Logger_tore` or
+  `ID_Logger_tore_neg` not 0), power in W, signed (±100 kW): positive
+  towards the `ID_Logger_tore` counter, negative towards the `_neg` one
+  (0.2.0, a real ED3).
 - **Relays read only by default** (lesson of Velbus / Qbus / IPX800): R1 and
   R2 become a switch or a light only when listed; X-8R outputs read only in
   this version (their write path is not confirmed, question 5).
@@ -169,9 +174,71 @@ output-index` (never an energy-sensor index: it would be counted as
   `currentGuard`, also checked by `indexStates`), R17 and R24 (as the review
   classed them).
 
+## Decisions for 0.2.0 (cce66's post 9, 2026-11-03)
+
+Next release: **minor** (0.2.0, new features), from Actions > Release.
+
+- **Clamp counters offered, in Wh** (published in kWh). Why Wh is
+  justified: GCE (Postman, "Objet Core Logger") says the Core Logger index
+  is "en wH" for every electricity counter, whatever its source ("la trame
+  de téléinformation ... ainsi que les 8 entrées Tore"); and his values
+  agree: between post 7 (core_logger) and post 9 (`objDescriptor`, whose
+  `indexPost`/`indexTotal` repeat his counter indexes), C23 (T7 negative)
+  went 274 442 -> 278 471 (+4 029) while C0 (teleinfo, Wh confirmed) went
+  132 533 861 -> 132 584 173 (+50 312): a ratio 0.080, against 57 W / 811 W
+  = 0.070 for their 5-minute averages (`moyenne`, W per GCE) in post 7; in
+  mWh the ratio would be 1000 times smaller. Over the ~71 h between the
+  posts, +4 029 Wh is 57 W, his `moyenne` exactly. C20 (T6-Solaire) +9 508
+  (134 W on average, a solar input in November), C22 unchanged at 19 610.
+  Not compared with the ED3's own page (question 6 unanswered): not needed
+  given the two above.
+- **Links**: `ID_Logger_tore[i]` / `ID_Logger_tore_neg[i]` = the counter
+  `_id` of clamp i+1's positive / negative direction, `ID_Logger_pulse[i]`
+  of pulse input i+1 (0 = none). Each counter fed so is named after its
+  input in Discover ("T1-EDF · Consumption (C11)", "T1-EDF (negative) ·
+  Injection (C19)", "Eau · Water (C25)"); a counter listed twice gets no
+  input name. The category stays the one of its number (GCE's table): the
+  ED3 assigns the number by the function chosen (consumption, injection...),
+  not by the direction (his T2-Maison negative is C12, a consumption slot).
+- **Format guard kept** (the TODO "ID_Logger_tore format guard"): the links
+  are read only in the form his ED3 gives: `ID_Logger_tore` an array of
+  exactly 8, each 0 or a counter `_id` (851968-851997), and
+  `ID_Logger_tore_neg` the same when given (GCE's example has none: an
+  older firmware; then no negative link). Anything else (counter numbers
+  0-29, another length, a text, null): not guessed, the counters 11 to 24
+  held as before, the status says the list is not in the expected form. A
+  malformed `ID_Logger_pulse` only loses the pulse names (water and gas
+  hold their own unit). Tested in test/cce66.test.js, mutants killed.
+- **Clamp power confirmed on a real ED3**: `puissance` mW = `irms` mA x
+  `urms` V x `cosphi` % / 100 for his 8 clamps (within 0.1 %; T1 1 455 467
+  for 6 580 x 235.53 x 0.9395). Published as one signed W feature, as
+  before: positive towards the `ID_Logger_tore` counter (T1-EDF 1 455 W),
+  negative otherwise (T2, T5, T7, T8). A separate production feature was not
+  added: the counters of each direction carry the energy, and Gladys's
+  power-sensor takes a signed value. T8 reads -67 W with no negative counter
+  (only a positive one, C16): the negative direction is then counted
+  nowhere on the ED3 (question 2).
+- **Not used**: `conso` (mWh per GCE, 857 on T8 only: meaning unknown),
+  `irms`, `cosphi`, `ConsoTore` / `ConsoPulse` (factors applied by the ED3
+  itself), `Pulse_*`.
+- **m-18** (review r4): a round during which a write, a read back or an
+  identity check left is applied but for R1 / R2, which keep the newer
+  value (and its time: applyRead skips them), when the round read the very
+  owner (verdict "same", the MAC read is the owner's or, owner known by its
+  address, none read; no duplicate slot, no other box, /data known); the
+  verdict, the owner and the MAC seen are left as they are. Otherwise the
+  round is dropped whole as before. A write still cuts the polling read in
+  flight (a cut round is not applied: unchanged). Tests in test/v020.test.js
+  (read backs every 2 s: every round applied; the relay kept; another MAC:
+  nothing applied), mutants killed.
+- **m-19**: water mL confirmed (meter). **m-20**: the docs say what is
+  confirmed by what (the clamp power by a real ED3 now), and that the MAC in
+  the tests is invented. **m-21**: `app.stop()` in `t.after` in
+  test/cce66.test.js (and the new tests).
+
 ## Decisions after cce66's answers (2026-11-01)
 
-- **Clamp counters still not offered.** His values lean to Wh: counter 11
+- **Clamp counters still not offered** (replaced in 0.2.0, above). His values lean to Wh: counter 11
   = 3 293 592 with an average of 585 W is 3 294 kWh (about 235 days of
   that average) in Wh, but 3.3 kWh (under 6 hours) in mWh; and its
   `indexprix` gives about 59 units per price unit for the counters 11, 12,
@@ -181,7 +248,8 @@ output-index` (never an energy-sensor index: it would be counted as
   counters 11 to 24 come from a clamp is not known. A lifetime index 1000
   times off cannot be taken back from Gladys's energy history (rule:
   units checked against the reference): held until questions 1 and 2.
-- **Teleinfo in Wh, water in mL: confirmed** (see Q2 above), no change.
+- **Teleinfo in Wh confirmed; water in mL then plausible** (confirmed by
+  his meter in post 9).
 - **Fewer than 30 counters**: nothing to change (the parser numbers by
   `_id`); docs and comments now say "up to 30".
 - **Firmware with a trailing space**: not used anywhere (only the MAC is
@@ -261,14 +329,3 @@ output-index` (never an energy-sensor index: it would be counted as
 - **m-8**: the counters fed by a clamp (listed in `ID_Logger_tore`; without
   the list, 11 to 24) are not offered until their unit is confirmed
   (question 2); the clamp power (mW, two sources) is kept.
-
-## Next patch (review r4, 0436564)
-
-- m-18: a request that leaves ahead of a polling round drops the whole round; only the relay states (and the MAC after an identity check) are stale. Apply counters, clamps, voltage and X-THL, skip only those, and add a test (reviewer's r4-steady.mjs: commands every 2 s apply 2 of 7 rounds).
-
-## Next patch (review cce66 r1, 17fd6ae)
-
-- m-19: the water unit (mL) is plausible, not checked against the meter: say "plausible, not compared with the meter" in `docs/en.md:73-76`, `docs/fr.md:78-82`, `CHANGELOG.md`, line 184 above, until cce66 compares counter 25 with his water meter.
-- m-20: "the clamp power is confirmed" (`docs/en.md:91`, `docs/fr.md:90`) reads as confirmed by a real device: it rests on GCE and the Api-Deck only. Also say that the MAC replayed in the tests is invented.
-- m-21: `test/cce66.test.js:108` and `:138`: move `app.stop()` into `t.after`.
-- Before lifting the clamp-counter guard: `parseEd3` holds the clamp counters only when `ID_Logger_tore` lists `_id`s (851968 + n). If the real ED3 lists 0-29 instead, the list counts as given and C11-C24 would be published in the assumed Wh. Check the format in cce66's `object/ed3/0` answer first.

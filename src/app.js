@@ -150,6 +150,9 @@ const typeOf = (target) =>
         ? 'xthl'
         : undefined;
 
+/** One of the ED3's own relays (R1, R2): the only targets a command or a read back changes. */
+const isEd3Relay = (target) => target.kind === KINDS.RELAY && target.ext === undefined;
+
 /** Is this command protective (never refused, sent first)? A relay switched off. */
 export const isProtective = (kind, value) => kind === KINDS.RELAY && value === 0;
 
@@ -1102,7 +1105,7 @@ export class Ed3App {
     if (ed3.error) throw new Ed3Error(ed3.error, 'not an Eco-Devices 3 answer', { sent: true });
     const targets = new Map(ed3.targets);
     const unreadTypes = [];
-    let clampSkipped = [];
+    let heldCounters = [];
     const mono = this.monotonic();
     if (this.namesAt === undefined || mono - this.namesAt >= TIMINGS.namesInterval) {
       const names = await this.secondary(() => client.counterNames(PRIORITY.READ, hooks()));
@@ -1115,7 +1118,7 @@ export class Ed3App {
       [
         'counters',
         () => client.counters(PRIORITY.READ, hooks()),
-        (json) => parseCounters(json, this.counterNames, ed3.clampCounters),
+        (json) => parseCounters(json, this.counterNames, ed3.held, ed3.sources),
       ],
       ['x8r', () => client.extensions('x8r', PRIORITY.READ, hooks()), parseX8r],
       ['xthl', () => client.extensions('xthl', PRIORITY.READ, hooks()), parseXthl],
@@ -1133,7 +1136,7 @@ export class Ed3App {
         continue;
       }
       for (const [code, target] of parsed.targets) targets.set(code, target);
-      if (parsed.skipped) clampSkipped = parsed.skipped;
+      if (parsed.skipped) heldCounters = parsed.skipped;
     }
     return {
       client,
@@ -1143,33 +1146,25 @@ export class Ed3App {
       unreadTypes,
       seen: this.seenOf(mac),
       mac,
-      clampSkipped,
-      clampsListed: ed3.clampsListed,
+      heldCounters,
     };
   }
 
-  async succeeded({
-    client,
-    targets,
-    at,
-    ahead,
-    unreadTypes,
-    seen,
-    mac,
-    clampSkipped = [],
-    clampsListed,
-  }) {
+  async succeeded({ client, targets, at, ahead, unreadTypes, seen, mac, heldCounters = [] }) {
     // A write, a read back (or an identity check) left after these reads, between two
-    // requests of the round: they are older than what it applied or read. Nothing of this
-    // round is applied (not a value, the owner, a duplicate nor the status); the next one
-    // comes at its time.
-    if (client.sentAhead !== ahead) {
+    // requests of the round: what it may contradict is older than it: the states of the
+    // ED3's relays, and the MAC (an identity check). The rest (counters, clamps, voltage,
+    // X-8R, X-THL) is applied, only when the round read the very owner of the devices
+    // (verdict, duplicate and owner left as they are); the relays keep their newer values.
+    // Otherwise nothing of this round is applied; the next one comes at its time.
+    const overtaken = client.sentAhead !== ahead;
+    if (overtaken && !this.mayApplyOvertaken(mac)) {
       this.logger.info('ed3: a command or a read back left during the round: round not applied');
       return;
     }
     // The same ED3 (its MAC, memory only) already in an earlier slot: this one is not used (its
     // consumption would be counted twice); read again every few minutes only.
-    const duplicate = mac ? this.peers?.duplicateOf(this.slot, mac) : undefined;
+    const duplicate = mac && !overtaken ? this.peers?.duplicateOf(this.slot, mac) : undefined;
     if (duplicate !== undefined) {
       if (this.duplicateOf !== duplicate) {
         this.logger.warn(`ed3: ED3 #${this.slot} is the same ED3 as ED3 #${duplicate}: not used`);
@@ -1188,7 +1183,7 @@ export class Ed3App {
       return;
     }
     this.duplicateOf = this.config.duplicateOf;
-    if (mac) this.peers?.macSeen(this.slot, mac);
+    if (mac && !overtaken) this.peers?.macSeen(this.slot, mac);
     this.firstRoundDone();
     this.pause = undefined;
     this.failures = 0;
@@ -1199,14 +1194,25 @@ export class Ed3App {
       this.memory.refused = null;
       this.logger.info('ed3: the ED3 accepts the API key again');
     }
+    const before = this.model;
     this.model = new Map();
     for (const [code, target] of targets) {
+      // Overtaken: an ED3 relay keeps what the newer request left in the model (its `at`
+      // too: applyRead skips it), never this older state.
+      if (overtaken && isEd3Relay(target)) {
+        const kept = before.get(code);
+        this.model.set(code, kept ?? { ...target, value: undefined, at: undefined });
+        continue;
+      }
       this.model.set(code, { ...target, at });
     }
-    this.round = { unreadTypes, clampSkipped, clampsListed };
-    // Which ED3 answered, against the owner of the devices, before anything is published.
-    this.seen = seen;
-    this.applyVerdict(this.judge(seen));
+    this.round = { unreadTypes, heldCounters };
+    // Which ED3 answered, against the owner of the devices, before anything is published
+    // (overtaken: checked by mayApplyOvertaken, the owner left as it is).
+    if (!overtaken) {
+      this.seen = seen;
+      this.applyVerdict(this.judge(seen));
+    }
     this.applyRead(at);
     // The counter indexes through their guards, /data written before Gladys gets one.
     const indexes = this.indexStates(at);
@@ -1218,6 +1224,23 @@ export class Ed3App {
   }
 
   /** The round failed: a pause; a refused key stops the reads; `other`: another GCE box answers. */
+  /**
+   * May a round overtaken by a request (m-18) be applied, its relays aside? Only when it read
+   * the owner of the devices, already judged the same, with nothing else in doubt: the MAC
+   * read by the round is the owner's (or, for an owner known by its address, none read at
+   * that very address), no earlier slot read it, no other box, /data known. Pure: changes
+   * nothing.
+   */
+  mayApplyOvertaken(mac) {
+    const owner = this.memory.owner;
+    if (this.verdict !== 'same' || this.ownerUnknown || !owner) return false;
+    if (this.duplicateOf !== undefined || this.otherDevice) return false;
+    if (mac && this.peers?.duplicateOf(this.slot, mac) !== undefined) return false;
+    const seen = this.seenOf(mac);
+    if (owner.kind === 'mac') return seen?.kind === 'mac' && seen.id === owner.id;
+    return seen === undefined && owner.id === this.config.key;
+  }
+
   async failed(err, mono, other) {
     this.firstRoundDone();
     if (other) {
@@ -1330,12 +1353,9 @@ export class Ed3App {
     }
     const held = this.heldEntries();
     if (held.length > 0) parts.push(T.indexHeld(heldList(held)));
-    if (this.round?.clampSkipped?.length > 0) {
-      const skipped = listOf(this.round.clampSkipped.map((n) => `C${n}`));
-      // Without `ID_Logger_tore`, which counters a clamp feeds is not known: none is said to be.
-      parts.push(
-        this.round.clampsListed ? T.clampCounters(skipped) : T.counterSourceUnknown(skipped),
-      );
+    if (this.round?.heldCounters?.length > 0) {
+      // Without the clamp links in the expected form, which counters a clamp feeds is not known.
+      parts.push(T.counterSourceUnknown(listOf(this.round.heldCounters.map((n) => `C${n}`))));
     }
     const faults = [...this.model.values()].filter((t) => t.fault === true);
     if (faults.length > 0) {

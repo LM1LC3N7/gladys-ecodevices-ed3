@@ -9,9 +9,11 @@ extensions and their X-THL sensors (temperature, humidity, luminosity).
 > Never tested with a real device: written from GCE's documentation of the
 > ED3 API (Postman "API ED3", linked from the ED3) and cce66's free tools
 > (ED3 Api-Deck and Mqtt-Deck). The answers of one real ED3 (cce66's,
-> firmware 1.3.0) are replayed in the tests: its MAC address, its counters,
-> the units of the teleinfo and water counters. Tell us what you see on
-> yours. Not affiliated with GCE Electronics.
+> firmware 1.3.0) are replayed in the tests: its MAC address (an invented
+> one of the same form in the tests), its counters and the clamps and pulse
+> inputs feeding them, the units of the teleinfo, clamp and water counters,
+> the clamp power. Tell us what you see on yours. Not affiliated with GCE
+> Electronics.
 
 ## Setup
 
@@ -58,22 +60,30 @@ kept are dropped. Use the integration of that box.
 | Counters 1 to 10 (teleinfo tariffs)        | plain sensor "Tariff index (kWh)", never counted twice       | `C1`               |
 | Counters 22 to 24 (storage) (¹)            | plain sensor "Storage index (kWh)"                           | `C22`              |
 | Counters 25 to 27 (water), 28 and 29 (gas) | volume (m³), out of the energy monitoring                    | `C25`, `C28`       |
-| Clamp linked to a counter                  | power (W)                                                    | `T1`               |
+| Clamp linked to a counter                  | power (W), signed (²)                                        | `T1`               |
 | Supply voltage                             | voltage (V)                                                  | `U`                |
 | X-THL                                      | temperature (°C), humidity (%), luminosity (lux)             | `XTHL4325376`      |
 
-The counter numbers are the ED3's (GCE assigns them by category). The names
-you gave them on the ED3 are used in Discover (read again every 10
-minutes); a name changed later on the ED3 does not rename a device already
-created. A counter at 0 (not set up, or not read by the ED3 yet) is not
-offered; a clamp without a counter neither. The ED3 may list fewer than 30
+The counter numbers are the ED3's (GCE assigns them by category). A counter
+fed by a clamp or a pulse input is named after it in Discover, as the ED3
+lists them (`ID_Logger_tore`, `ID_Logger_tore_neg`, `ID_Logger_pulse`,
+`ToreName`, `PulseName`): "T1-EDF · Consumption (C11)", "T1-EDF (negative)
+· Injection (C19)" for the counter of the clamp's other direction, "Eau ·
+Water (C25)". The others take the name you gave the counter on the ED3
+(read again every 10 minutes). A name changed later on the ED3 does not
+rename a device already created. A counter at 0 (not set up, or not read by
+the ED3 yet) is not offered; a clamp that feeds no counter (0 in both
+lists) neither. The ED3 may list fewer than 30
 counters (a real one listed 26): a counter is known by its ED3 id, never
 by its place in the list, and one not listed is not offered.
 
-Units: the teleinfo indexes are in Wh on the ED3 (checked on a real one:
-its counter 0 matched, within a few minutes, the same Linky read by an
-Eco-Devices RT2), published in kWh; water and gas in mL, published in m³
-(a real water counter: 60,707,000 mL = 60.707 m³).
+Units: every electricity index is in Wh on the ED3, published in kWh.
+Checked on a real one: its counter 0 (teleinfo) matched, within a few
+minutes, the same Linky read by an Eco-Devices RT2; the counter of one of
+its clamps grew 4,029 while its teleinfo grew 50,312 Wh, at 57 W against
+811 W on average (Wh, not mWh). Water and gas in mL, published in m³:
+compared with a real water meter (61,503.0 L on the meter, 61,503,000 on
+the ED3).
 
 The ED3 is read every 15 seconds by default (10 s at least). A value the
 ED3 does not give (absent, a text, out of range, a voltage of 0 V) is not
@@ -82,20 +92,23 @@ publishes nothing while it does, and the status names it. An X-8R or X-THL
 without an extension code (an object created, nothing paired) is not
 offered.
 
-(¹) **A counter fed by a clamp is not offered in this version** (those the
-ED3 links to a clamp in `ID_Logger_tore`): the unit of its index is not
-confirmed (Wh says GCE, but GCE's own example suggests mWh, which would make
-values 1000 times too large). The values of a real ED3 lean to Wh, but were
-not compared with the ED3's own page, and that ED3 did not say which
-counters its clamps feed: a lifetime index 1000 times off would stay in the
-energy history of Gladys, so they wait for that check. The power of the
-clamp is confirmed (mW, published in W). They will be offered once the unit
-is checked on a real ED3.
-The status names those holding an index ("C12, C13 (fed by a clamp): not
-offered until their unit is confirmed"). An ED3 that does not give that list
-does not say which counters its clamps feed: the source of counters 11 to 24
-is then unknown, and all of them are held the same way, the status saying so
-("C11, C19 (source unknown: …)").
+(¹) The counters a clamp may feed (11 to 24) are offered only when the ED3
+lists its clamp links in the form a real one gives (`ID_Logger_tore`: 8
+entries, each 0 or a counter id; `ID_Logger_tore_neg` the same when given):
+that is how their unit (Wh) was checked. An ED3 that does not give that
+list, or gives it in another form (another firmware), does not say which
+counters its clamps feed: counters 11 to 24 are then held, and the status
+names those holding an index ("C11, C19 not offered: this ED3 does not list
+the counters its clamps feed in the expected form…"). Nothing is guessed
+from a list of another form.
+
+(²) The clamp power is the ED3's `puissance` (mW, published in W, one
+decimal): on a real ED3 it equals current × voltage × power factor for each
+clamp (1,455,467 mW for 6.58 A × 235.5 V × 0.94). Its sign is kept: positive
+while the clamp feeds its counter (`ID_Logger_tore`, consumption), negative
+in the other direction (`ID_Logger_tore_neg`: production, injection, a
+battery discharging). A clamp listed for one direction only still shows
+the other one as a negative power.
 
 ## Counters: lifetime indexes, never 0, a drop or a jump held
 
@@ -272,10 +285,11 @@ bring them back. They come back with the first read that succeeds.
 
 - Relays R1 and R2, counters, clamps, voltage, X-8R (read only) and X-THL;
   not the detailed teleinfo frame (apparent power, current tariff), the
-  pulse inputs, the X-8R commands, the schedules, the virtual variables nor
+  states of the pulse inputs themselves (the counters they feed are read),
+  the X-8R commands, the schedules, the virtual variables nor
   Modbus in this version.
-- The sign of the power of a clamp reading a production is not documented:
-  the power is published as the ED3 gives it (in W).
+- The clamp power is one signed value (W): Gladys gets no separate
+  production feature; the counters of each direction carry the energy.
 - The integration reads the local HTTP API, not the MQTT of the ED3.
 - Three ED3 at most per integration.
 - http only (the ED3 answers over http on the local network).

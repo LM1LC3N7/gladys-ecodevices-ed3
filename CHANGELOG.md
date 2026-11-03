@@ -10,6 +10,35 @@ the notes of the version's GitHub Release.
 
 ## [Unreleased]
 
+Next release: minor (0.2.0).
+
+### Added
+
+- The counters fed by a current clamp are offered, in kWh: their index is in
+  Wh as the others (GCE's documentation, and checked on a real Eco-Devices 3:
+  the counter of one of its clamps grew at its own average power in Wh).
+  Each counter fed by a clamp or a pulse input is named after it in Discover,
+  as the ED3 lists them (`ID_Logger_tore`, `ID_Logger_tore_neg`,
+  `ID_Logger_pulse`): "T1-EDF · Consumption (C11)", "T1-EDF (negative) ·
+  Injection (C19)", "Eau · Water (C25)".
+- A clamp feeding only a counter of its negative direction is offered too.
+
+### Changed
+
+- The clamp power (W) is checked on a real ED3 (current × voltage × power
+  factor); its sign is documented: negative in the direction of production
+  or injection.
+- A list of clamp links in another form than a real ED3 gives (another
+  length, counter numbers instead of ids: another firmware) is never
+  guessed: the counters 11 to 24 are then held, as before, and the status
+  says why.
+- A polling round during which a command, a read back or an identity check
+  left is now applied, but for the relays R1 and R2 (they keep the newer
+  value), when it read the ED3 the devices belong to; before, the whole
+  round was dropped (under frequent commands, one round in three applied).
+- The water unit (mL) is confirmed against a real water meter. The docs say
+  what was checked on a real ED3 and with what.
+
 ## [0.1.2] - 2026-11-01
 
 ### Changed

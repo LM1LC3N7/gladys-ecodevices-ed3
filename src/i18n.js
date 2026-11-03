@@ -90,6 +90,18 @@ const COUNTER_NAMES = {
 /** The code as the user reads it: `R1`, `X8R4259840-3`, `C11`, `T2`. */
 export const shownCode = (code) => (code === 'mains' ? 'U' : code.toUpperCase());
 
+/** "T1-EDF", "T1-EDF (negative)", "Clamp 2", "Pulse 1": the input feeding a counter; undefined when none. */
+function sourceName(source) {
+  if (!source) return undefined;
+  const input =
+    source.name ?? (source.from === 'pulse' ? `Pulse ${source.input}` : `Clamp ${source.input}`);
+  const inputFr =
+    source.name ?? (source.from === 'pulse' ? `Impulsion ${source.input}` : `Tore ${source.input}`);
+  return source.negative
+    ? both(`${input} (negative)`, `${inputFr} (négatif)`)
+    : both(input, inputFr);
+}
+
 /** The name of a target in Gladys: "Relay 1 (R1)", "Garage relay 2 (X8R12-2)", "Counter 11 · Kitchen (C11)". */
 export function targetName(target) {
   const code = shownCode(target.code);
@@ -103,6 +115,11 @@ export function targetName(target) {
         : named(`Relay ${target.n} (${code})`, `Relais ${target.n} (${code})`);
     case KINDS.COUNTER: {
       const kind = COUNTER_NAMES[target.counter] ?? both('Counter', 'Compteur');
+      // Fed by a clamp or a pulse input (`ID_Logger_*`): its name first ("T1-EDF").
+      const source = sourceName(target.source);
+      if (source) {
+        return both(`${source.en} · ${kind.en} (${code})`, `${source.fr} · ${kind.fr} (${code})`);
+      }
       return target.name
         ? both(`${target.name} · ${kind.en} (${code})`, `${target.name} · ${kind.fr} (${code})`)
         : both(`${kind.en} ${target.n} (${code})`, `${kind.fr} ${target.n} (${code})`);
@@ -267,16 +284,11 @@ export const T = {
       `Switch-off clicked before the configuration was read, not sent (relay not listed or another Eco-Devices 3): ${list.en}.`,
       `Extinction cliquée avant la lecture de la configuration, non envoyée (relais non listé ou autre Eco-Devices 3) : ${list.fr}.`,
     ),
-  clampCounters: (list) =>
-    both(
-      `${list.en} (fed by a clamp): not offered until their unit is confirmed.`,
-      `${list.fr} (alimentés par un tore) : non proposés tant que leur unité n’est pas confirmée.`,
-    ),
-  // Without `ID_Logger_tore`: any counter 11 to 24 may be fed by a clamp, none is known to be.
+  // Without `ID_Logger_tore` in the expected form: any counter 11 to 24 may be fed by a clamp.
   counterSourceUnknown: (list) =>
     both(
-      `${list.en} (source unknown: the ED3 does not list the counters its clamps feed, each may be one): not offered until the unit of those counters is confirmed.`,
-      `${list.fr} (source inconnue : l’ED3 ne liste pas les compteurs alimentés par ses tores, chacun peut en être un) : non proposés tant que l’unité de ces compteurs n’est pas confirmée.`,
+      `${list.en} not offered: this ED3 does not list the counters its clamps feed in the expected form (another firmware?), and the unit of those counters was checked with that list only.`,
+      `${list.fr} non proposés : cet ED3 ne liste pas les compteurs alimentés par ses tores sous la forme attendue (autre firmware ?), et l’unité de ces compteurs n’a été vérifiée qu’avec cette liste.`,
     ),
   indexHeld: (list) =>
     both(

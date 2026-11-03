@@ -371,10 +371,10 @@ test('m-16: without ID_Logger_tore, the counters 11 to 24 are held, their source
   assert.ok(ids.includes('ext:ed3:counter:c0'));
   assert.match(
     message(gladys),
-    /C11, C12, C19, C20 \(source unknown: the ED3 does not list the counters its clamps feed, each may be one\): not offered until the unit of those counters is confirmed/,
+    /C11, C12, C19, C20 not offered: this ED3 does not list the counters its clamps feed in the expected form/,
   );
   assert.doesNotMatch(message(gladys), /fed by a clamp/);
-  assert.match(message(gladys, 'fr'), /C11, C12, C19, C20 \(source inconnue : l’ED3 ne liste pas/);
+  assert.match(message(gladys, 'fr'), /C11, C12, C19, C20 non proposés : cet ED3 ne liste pas/);
   assert.doesNotMatch(message(gladys, 'fr'), /\(alimentés par un tore\)/);
   app.stop();
 });
